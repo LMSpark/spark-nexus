@@ -128,7 +128,7 @@ public class AuthController {
 
     private List<String> navKeys(String role, List<CapabilityRow> capabilities) {
         if ("ADMIN".equals(role)) {
-            return List.of("dashboard", "screen", "communities", "billing", "revenue", "expenses", "votes", "repairs", "finance", "banking", "registrations", "acceptance", "audit");
+            return List.of("dashboard", "screen", "neighborhood", "communities", "billing", "revenue", "expenses", "votes", "repairs", "finance", "banking", "registrations", "acceptance", "audit");
         }
         java.util.LinkedHashSet<String> keys = new java.util.LinkedHashSet<>();
         addIf(keys, capabilities, "COMMUNITY_PROFILE", "READ", "communities");
@@ -140,12 +140,16 @@ public class AuthController {
         addIf(keys, capabilities, "COMPLAINT", "READ", "repairs");
         addIf(keys, capabilities, "FINANCE", "READ", "finance");
         addIf(keys, capabilities, "BANK_FLOW", "READ", "banking");
+        addIf(keys, capabilities, "COMMUNITY_GOVERNANCE", "READ", "neighborhood");
         if ("GOVERNMENT".equals(role) || "STREET".equals(role)) {
             keys.add("dashboard");
             keys.add("screen");
             keys.add("registrations");
             keys.add("acceptance");
             keys.add("audit");
+        }
+        if ("NEIGHBORHOOD".equals(role)) {
+            keys.add("registrations");
         }
         if (!keys.isEmpty() && ("PROPERTY".equals(role) || "COMMITTEE".equals(role) || "BANK".equals(role))) {
             keys.add("acceptance");

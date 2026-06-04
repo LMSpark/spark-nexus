@@ -5,10 +5,12 @@ import com.dsyg.platform.auth.TokenService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -113,6 +115,9 @@ public class RegistrationController {
 
     @PostMapping("/registrations/tenants")
     public Map<String, Object> registerTenant(@RequestBody TenantRegistrationRequest body) {
+        if ("GOVERNMENT".equalsIgnoreCase(body.tenantType()) || "STREET".equalsIgnoreCase(body.tenantType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "政府/街道主体由平台预置并绑定小区，不走公开注册流程");
+        }
         String applicationNo = nextApplicationNo();
         String payload = """
             {"tenantType":"%s","tenantName":"%s","unifiedCreditCode":"%s","contactName":"%s","contactPhone":"%s","adminUsername":"%s","adminPassword":"%s","adminDisplayName":"%s"}
@@ -139,10 +144,21 @@ public class RegistrationController {
 
     @PostMapping("/registrations/communities")
     public Map<String, Object> registerCommunity(@RequestBody CommunityRegistrationRequest body) {
+        if (body.neighborhoodTenantId() == null || body.neighborhoodTenantId() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "小区备案必须选择所属居委会");
+        }
+        String neighborhoodTenantName = jdbc.sql("""
+                select tenant_name from tenant
+                where id = :tenantId and tenant_type = 'NEIGHBORHOOD' and status = 'ACTIVE'
+                """)
+            .param("tenantId", body.neighborhoodTenantId())
+            .query(String.class)
+            .optional()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "所选居委会不存在或未启用"));
         String applicationNo = nextApplicationNo();
         String payload = """
-            {"district":"%s","street":"%s","neighborhood":"%s","name":"%s","households":%d}
-            """.formatted(safe(body.district()), safe(body.street()), safe(body.neighborhood()), safe(body.name()), body.households()).trim();
+            {"district":"%s","street":"%s","neighborhood":"%s","name":"%s","households":%d,"neighborhoodTenantId":%d,"neighborhoodTenantName":"%s"}
+            """.formatted(safe(body.district()), safe(body.street()), safe(body.neighborhood()), safe(body.name()), body.households(), body.neighborhoodTenantId(), safe(neighborhoodTenantName)).trim();
         jdbc.sql("""
                 insert into registration_application(application_no, applicant_type, applicant_name, applicant_phone, target_type,
                                                      target_id, payload_json, applicant_phone_cipher, payload_cipher, status, submitted_at)
@@ -159,9 +175,21 @@ public class RegistrationController {
         return Map.of("applicationNo", applicationNo, "status", "PENDING");
     }
 
+    @GetMapping("/registrations/neighborhood-options")
+    public List<NeighborhoodTenantOption> neighborhoodTenantOptions() {
+        return jdbc.sql("""
+                select id tenantId, tenant_name tenantName, contact_name contactName, contact_phone contactPhone
+                from tenant
+                where tenant_type = 'NEIGHBORHOOD' and status = 'ACTIVE'
+                order by tenant_name, id
+                """)
+            .query(NeighborhoodTenantOption.class)
+            .list();
+    }
+
     @GetMapping("/registrations/community-options")
     public List<CommunityOptionRow> registrationCommunityOptions(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "COMMITTEE", "BANK", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "PROPERTY", "COMMITTEE", "BANK", "MERCHANT");
         return jdbc.sql("""
                 select id, district, street, neighborhood, name
                 from community
@@ -221,7 +249,34 @@ public class RegistrationController {
 
     @GetMapping("/registrations/pending")
     public List<RegistrationRow> pendingRegistrations(HttpServletRequest request) {
-        access.assertTenantAdmin(principal(request));
+        TokenService.Principal principal = principal(request);
+        if ("NEIGHBORHOOD".equals(principal.role())) {
+            return jdbc.sql("""
+                    select id, application_no applicationNo, applicant_type applicantType, applicant_name applicantName,
+                           applicant_phone applicantPhone, target_type targetType, target_id targetId, payload_json payloadJson,
+                           status, submitted_at submittedAt, reviewed_by reviewedBy, reviewed_at reviewedAt, review_comment reviewComment
+                    from registration_application
+                    where (
+                        target_type = 'COMMUNITY'
+                        and json_unquote(json_extract(payload_json, '$.neighborhoodTenantId')) = :tenantId
+                    )
+                    or (
+                        target_type in ('COMMUNITY_RELATION', 'BANK_SERVICE')
+                        and target_id in (
+                            select community_id from tenant_community_relation
+                            where tenant_id = :tenantIdLong
+                              and relation_type = 'NEIGHBORHOOD_GOVERN'
+                              and status = 'ACTIVE'
+                        )
+                    )
+                    order by case status when 'PENDING' then 0 else 1 end, submitted_at desc
+                    """)
+                .param("tenantId", String.valueOf(principal.tenantId()))
+                .param("tenantIdLong", principal.tenantId())
+                .query(RegistrationRow.class)
+                .list();
+        }
+        access.assertTenantAdmin(principal);
         return jdbc.sql("""
                 select id, application_no applicationNo, applicant_type applicantType, applicant_name applicantName,
                        applicant_phone applicantPhone, target_type targetType, target_id targetId, payload_json payloadJson,
@@ -256,8 +311,8 @@ public class RegistrationController {
     @PostMapping("/registrations/{id}/approve")
     public Map<String, Object> approveRegistration(@PathVariable long id, @RequestBody(required = false) ReviewRequest body, HttpServletRequest request) {
         TokenService.Principal principal = principal(request);
-        access.assertTenantAdmin(principal);
         RegistrationRow application = registration(id);
+        assertRegistrationReviewAccess(principal, application);
         Long targetId = application.targetId();
         if ("TENANT".equals(application.targetType()) && targetId == null) {
             targetId = createTenantFromApplication(application);
@@ -299,7 +354,8 @@ public class RegistrationController {
     @PostMapping("/registrations/{id}/reject")
     public Map<String, Object> rejectRegistration(@PathVariable long id, @RequestBody(required = false) ReviewRequest body, HttpServletRequest request) {
         TokenService.Principal principal = principal(request);
-        access.assertTenantAdmin(principal);
+        RegistrationRow application = registration(id);
+        assertRegistrationReviewAccess(principal, application);
         jdbc.sql("""
                 update registration_application
                 set status = 'REJECTED', reviewed_by = :reviewedBy, reviewed_at = now(), review_comment = :comment
@@ -336,6 +392,9 @@ public class RegistrationController {
     public Map<String, Object> createCommunityRelation(@PathVariable long communityId, @RequestBody CommunityRelationRequest body, HttpServletRequest request) {
         TokenService.Principal principal = principal(request);
         access.assertTenantAdmin(principal);
+        if (isNeighborhoodReviewedServiceRelation(body.relationType())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "服务商绑定小区必须提交申请并由所属居委会审批");
+        }
         jdbc.sql("""
                 insert into tenant_community_relation(tenant_id, community_id, relation_type, status, start_date, end_date, created_at)
                 values(:tenantId, :communityId, :relationType, 'ACTIVE', :startDate, null, now())
@@ -658,6 +717,7 @@ public class RegistrationController {
             case "BANK" -> "BANK";
             case "GOVERNMENT" -> "GOVERNMENT";
             case "COMMITTEE" -> "COMMITTEE";
+            case "NEIGHBORHOOD" -> "NEIGHBORHOOD";
             case "MERCHANT" -> "MERCHANT";
             default -> "PROPERTY";
         };
@@ -710,6 +770,20 @@ public class RegistrationController {
                 """)
             .param("communityId", communityId)
             .update();
+        long neighborhoodTenantId = longValue(payload.get("neighborhoodTenantId"), 0);
+        if (neighborhoodTenantId > 0) {
+            jdbc.sql("""
+                    insert into tenant_community_relation(tenant_id, community_id, relation_type, status, start_date, end_date, created_at)
+                    values(:tenantId, :communityId, 'NEIGHBORHOOD_GOVERN', 'ACTIVE', current_date, null, now())
+                    on duplicate key update status = 'ACTIVE', end_date = null
+                    """)
+                .param("tenantId", neighborhoodTenantId)
+                .param("communityId", communityId)
+                .update();
+            grantScopes(1, neighborhoodTenantId, communityId,
+                new String[]{"COMMUNITY_GOVERNANCE", "COMMUNITY_PROFILE", "HOUSE", "RESIDENT", "REPAIR", "COMPLAINT", "VOTE"},
+                new String[]{"READ", "WRITE", "APPROVE", "EXPORT"});
+        }
         return communityId;
     }
 
@@ -1004,6 +1078,76 @@ public class RegistrationController {
         return Long.parseLong(value.toString());
     }
 
+    private void assertRegistrationReviewAccess(TokenService.Principal principal, RegistrationRow application) {
+        if (requiresNeighborhoodApproval(application)) {
+            Long communityId = reviewCommunityId(application);
+            if ("NEIGHBORHOOD".equals(principal.role()) && canReviewNeighborhoodApplication(principal, application, communityId)) {
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "小区备案和服务商绑定小区必须由所属居委会审批");
+        }
+        if (access.isPlatformAdmin(principal) || "GOVERNMENT".equals(principal.role()) || "STREET".equals(principal.role())) {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "当前角色无权审核该注册申请");
+    }
+
+    private boolean requiresNeighborhoodApproval(RegistrationRow application) {
+        if ("COMMUNITY".equals(application.targetType())) {
+            return longValue(registrationPayload(application).get("neighborhoodTenantId"), 0) > 0;
+        }
+        if ("BANK_SERVICE".equals(application.targetType())) {
+            return true;
+        }
+        if ("COMMUNITY_RELATION".equals(application.targetType())) {
+            String relationType = stringValue(registrationPayload(application).get("relationType"), "");
+            return isNeighborhoodReviewedServiceRelation(relationType);
+        }
+        return false;
+    }
+
+    private boolean isNeighborhoodReviewedServiceRelation(String relationType) {
+        return "PROPERTY_SERVICE".equals(relationType)
+            || "BANK_COLLECTION".equals(relationType)
+            || "BANK_SUPERVISION".equals(relationType)
+            || "LOCAL_SERVICE".equals(relationType);
+    }
+
+    private Long reviewCommunityId(RegistrationRow application) {
+        if ("COMMUNITY".equals(application.targetType())) {
+            return null;
+        }
+        if (application.targetId() != null && application.targetId() > 0) {
+            return application.targetId();
+        }
+        Map<String, Object> payload = registrationPayload(application);
+        long communityId = longValue(payload.get("communityId"), 0);
+        return communityId > 0 ? communityId : null;
+    }
+
+    private boolean canReviewNeighborhoodApplication(TokenService.Principal principal, RegistrationRow application, Long communityId) {
+        if ("COMMUNITY".equals(application.targetType())) {
+            long neighborhoodTenantId = longValue(registrationPayload(application).get("neighborhoodTenantId"), 0);
+            return neighborhoodTenantId == principal.tenantId();
+        }
+        return communityId != null && isNeighborhoodTenantForCommunity(principal.tenantId(), communityId);
+    }
+
+    private boolean isNeighborhoodTenantForCommunity(long tenantId, long communityId) {
+        Integer count = jdbc.sql("""
+                select count(*) from tenant_community_relation
+                where tenant_id = :tenantId
+                  and community_id = :communityId
+                  and relation_type = 'NEIGHBORHOOD_GOVERN'
+                  and status = 'ACTIVE'
+                """)
+            .param("tenantId", tenantId)
+            .param("communityId", communityId)
+            .query(Integer.class)
+            .single();
+        return count != null && count > 0;
+    }
+
     private TokenService.Principal principal(HttpServletRequest request) {
         return (TokenService.Principal) request.getAttribute("principal");
     }
@@ -1101,7 +1245,8 @@ public class RegistrationController {
     }
 
     public record TenantRegistrationRequest(String tenantType, String tenantName, String unifiedCreditCode, String contactName, String contactPhone, String adminUsername, String adminPassword, String adminDisplayName) {}
-    public record CommunityRegistrationRequest(String district, String street, String neighborhood, String name, int households, String contactPhone) {}
+    public record CommunityRegistrationRequest(String district, String street, String neighborhood, String name, int households, String contactPhone, Long neighborhoodTenantId) {}
+    public record NeighborhoodTenantOption(long tenantId, String tenantName, String contactName, String contactPhone) {}
     public record CommunityOptionRow(long id, String district, String street, String neighborhood, String name) {}
     public record CommunityRelationApplicationRequest(long tenantId, long communityId, String relationType, LocalDate startDate, List<String> dataScopes, List<String> permissions) {}
     public record BankServiceApplicationRequest(long bankTenantId, long communityId, String serviceType, Long fundAccountId, String merchantNo) {}

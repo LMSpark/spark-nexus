@@ -37,6 +37,7 @@ class MultiTenantAcceptanceTest {
     @Test
     void propertyRegistrationAndCommunityAuthorizationCreateRealDataBoundary() throws Exception {
         String adminToken = login("admin", "admin123");
+        String neighborhoodToken = login("neighborhood", "admin123");
         String username = "property_accept_" + System.currentTimeMillis();
 
         JsonNode submitResult = postJson("/api/registrations/tenants", "", """
@@ -75,7 +76,10 @@ class MultiTenantAcceptanceTest {
             }
             """.formatted(tenantId));
         long relationApplicationId = registrationId(relationResult.get("applicationNo").asText());
-        postJson("/api/registrations/" + relationApplicationId + "/approve", adminToken, "{\"comment\":\"服务关系通过\"}");
+        mockMvc.perform(get("/api/registrations/pending").header("Authorization", bearer(neighborhoodToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem((int) relationApplicationId)));
+        postJson("/api/registrations/" + relationApplicationId + "/approve", neighborhoodToken, "{\"comment\":\"居委会同意物业服务关系\"}");
 
         mockMvc.perform(get("/api/communities").header("Authorization", bearer(propertyToken)))
             .andExpect(status().isOk())
@@ -111,7 +115,7 @@ class MultiTenantAcceptanceTest {
 
     @Test
     void bankServiceAndReconciliationAreBoundByCommunityAuthorization() throws Exception {
-        String adminToken = login("admin", "admin123");
+        String neighborhoodToken = login("neighborhood", "admin123");
         String bankToken = login("bank", "admin123");
 
         JsonNode result = postJson("/api/registrations/bank-services", bankToken, """
@@ -123,7 +127,10 @@ class MultiTenantAcceptanceTest {
             }
             """);
         long applicationId = registrationId(result.get("applicationNo").asText());
-        postJson("/api/registrations/" + applicationId + "/approve", adminToken, "{\"comment\":\"银行服务通过\"}");
+        mockMvc.perform(get("/api/registrations/pending").header("Authorization", bearer(neighborhoodToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem((int) applicationId)));
+        postJson("/api/registrations/" + applicationId + "/approve", neighborhoodToken, "{\"comment\":\"居委会同意银行服务\"}");
 
         mockMvc.perform(get("/api/bank/configs?communityId=1").header("Authorization", bearer(bankToken)))
             .andExpect(status().isOk())
@@ -224,6 +231,7 @@ class MultiTenantAcceptanceTest {
     @Test
     void merchantRegistrationAndLocalServiceRelationAreBoundByCommunityAuthorization() throws Exception {
         String adminToken = login("admin", "admin123");
+        String neighborhoodToken = login("neighborhood", "admin123");
         String ownerToken = login("owner", "admin123");
         String username = "merchant_accept_" + System.currentTimeMillis();
 
@@ -268,7 +276,10 @@ class MultiTenantAcceptanceTest {
             }
             """.formatted(merchantTenantId));
         long relationApplicationId = registrationId(relationResult.get("applicationNo").asText());
-        postJson("/api/registrations/" + relationApplicationId + "/approve", adminToken, "{\"comment\":\"本地生活服务通过\"}");
+        mockMvc.perform(get("/api/registrations/pending").header("Authorization", bearer(neighborhoodToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem((int) relationApplicationId)));
+        postJson("/api/registrations/" + relationApplicationId + "/approve", neighborhoodToken, "{\"comment\":\"本地生活服务通过\"}");
 
         mockMvc.perform(get("/api/auth/capabilities").header("Authorization", bearer(merchantToken)))
             .andExpect(status().isOk())

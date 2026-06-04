@@ -23,6 +23,7 @@ public class GatewayController {
     private static final List<String> PUBLIC_PATHS = List.of(
         "/api/auth/login",
         "/api/health",
+        "/api/registrations/neighborhood-options",
         "/api/registrations/tenants",
         "/api/registrations/communities",
         "/api/resident/register",
@@ -55,10 +56,11 @@ public class GatewayController {
         return List.of(
             new RouteGroup("AUTH", "/api/auth/**", "认证、租户切换、能力菜单", List.of("PUBLIC_LOGIN", "USER")),
             new RouteGroup("REGISTRATION", "/api/registrations/**,/api/tenants/**,/api/authorizations/**", "多租户注册准入与数据授权", List.of("ADMIN", "GOVERNMENT", "STREET")),
-            new RouteGroup("COMMUNITY", "/api/communities,/api/houses,/api/owners/**", "小区、房屋、业主门户", List.of("ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "COMMITTEE", "OWNER")),
+            new RouteGroup("COMMUNITY", "/api/communities,/api/houses,/api/owners/**", "小区、房屋、业主门户", List.of("ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "PROPERTY", "COMMITTEE", "OWNER")),
+            new RouteGroup("NEIGHBORHOOD", "/api/neighborhood/**", "居委会事项、网格治理、关爱走访、资源联动", List.of("ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD")),
             new RouteGroup("BILLING_PAYMENT", "/api/billing/**,/api/payments/**", "收费、支付、退款、渠道账单", List.of("ADMIN", "PROPERTY", "OWNER", "CALLBACK")),
             new RouteGroup("REVENUE_EXPENSE", "/api/revenue,/api/expenses/**,/api/approvals/**", "公共收益、支出、审批流", List.of("ADMIN", "COMMITTEE", "STREET", "GOVERNMENT")),
-            new RouteGroup("GOVERNANCE", "/api/votes/**,/api/work-orders/**,/api/announcements,/api/messages/**", "投票问卷、报修投诉、公告消息", List.of("ADMIN", "COMMITTEE", "PROPERTY", "OWNER")),
+            new RouteGroup("GOVERNANCE", "/api/votes/**,/api/work-orders/**,/api/announcements,/api/messages/**", "投票问卷、报修投诉、公告消息、微信治理通知", List.of("ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT", "OWNER")),
             new RouteGroup("FINANCE", "/api/finance/**", "凭证、账簿、现金流量表、PDF 导出", List.of("ADMIN", "COMMITTEE", "GOVERNMENT", "STREET")),
             new RouteGroup("BANK", "/api/bank/**", "银行配置、流水、对账、放款回执", List.of("ADMIN", "BANK", "GOVERNMENT", "STREET", "CALLBACK")),
             new RouteGroup("SUPERVISION", "/api/supervision/**", "监管驾驶舱、大屏、预警、信用评分", List.of("ADMIN", "GOVERNMENT", "STREET")),

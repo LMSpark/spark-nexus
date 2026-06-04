@@ -127,6 +127,7 @@ public class IntegrationController {
             "mode", mode,
             "adapters", List.of(
                 Map.of("code", "WECHAT_PAY", "name", "微信支付", "status", adapterStatus()),
+                Map.of("code", "WECHAT_MESSAGE", "name", "微信社区通知", "status", adapterStatus()),
                 Map.of("code", "ALIPAY", "name", "支付宝支付", "status", adapterStatus()),
                 Map.of("code", "BANK_DIRECT", "name", "银行直连", "status", adapterStatus()),
                 Map.of("code", "SMS", "name", "短信通知", "status", "dev".equals(smsProvider) ? "DEV_SIMULATED" : "REAL_CONFIGURED"),
@@ -151,6 +152,7 @@ public class IntegrationController {
         requireAnyRole(request, "ADMIN");
         List<AdapterConfigDraft> configs = List.of(
             new AdapterConfigDraft("WECHAT_PAY", "微信支付商户平台", mode, "https://api.mch.weixin.qq.com", wechatMchId, adapterConfigStatus(wechatMchId, wechatAppId, wechatCallbackSecret)),
+            new AdapterConfigDraft("WECHAT_MESSAGE", "微信小程序/公众号社区通知", mode, "https://api.weixin.qq.com", wechatAppId, adapterConfigStatus(wechatAppId)),
             new AdapterConfigDraft("ALIPAY", "支付宝支付", mode, "https://openapi.alipay.com/gateway.do", alipayMerchantId, adapterConfigStatus(alipayAppId, alipayMerchantId, alipayPrivateKey, alipayPublicKey, alipayCallbackSecret)),
             new AdapterConfigDraft("BANK_DIRECT", "银行直连监管接口", mode, bankBaseUrl, bankMerchantId, adapterConfigStatus(bankBaseUrl, bankMerchantId, bankCallbackSecret)),
             new AdapterConfigDraft("SMS", "短信通知网关", smsProvider, "", "", adapterConfigStatusForProvider(smsProvider, smsApiKey)),
@@ -699,6 +701,7 @@ public class IntegrationController {
         checks.add(configCheck("WECHAT_PAY", "微信商户号", wechatMchId, devMode));
         checks.add(configCheck("WECHAT_PAY", "微信小程序/公众号 AppID", wechatAppId, devMode));
         checks.add(secretCheck("WECHAT_PAY", "微信回调验签密钥", wechatCallbackSecret, devMode));
+        checks.add(configCheck("WECHAT_MESSAGE", "微信社区通知 AppID", wechatAppId, devMode));
         checks.add(configCheck("ALIPAY", "支付宝 AppID", alipayAppId, devMode));
         checks.add(configCheck("ALIPAY", "支付宝商户号", alipayMerchantId, devMode));
         checks.add(secretCheck("ALIPAY", "支付宝应用私钥", alipayPrivateKey, devMode));

@@ -12,6 +12,7 @@ const ownerAppUrl = ((import.meta as unknown as { env?: Record<string, string> }
 const nav = [
   ['dashboard', 'Nexus 驾驶舱'],
   ['screen', '治理大屏'],
+  ['neighborhood', '居委会工作台'],
   ['communities', '小区档案'],
   ['billing', '账单收费'],
   ['revenue', '公共收益'],
@@ -30,17 +31,25 @@ type PublicRegistrationMode = 'tenant' | 'community'
 
 const tenantTypeOptions = [
   { label: '物业公司', value: 'PROPERTY' },
-  { label: '政府部门', value: 'GOVERNMENT' },
+  { label: '社区居委会', value: 'NEIGHBORHOOD' },
   { label: '小区业委会', value: 'COMMITTEE' },
-  { label: '银行机构', value: 'BANK' },
-  { label: '社区商户', value: 'MERCHANT' }
+  { label: '银行服务商', value: 'BANK' },
+  { label: '本地服务商', value: 'MERCHANT' }
 ]
 
 const relationTypeOptions = [
-  { label: '物业服务', value: 'PROPERTY_SERVICE' },
+  { label: '服务商-物业服务', value: 'PROPERTY_SERVICE' },
+  { label: '居委会治理', value: 'NEIGHBORHOOD_GOVERN' },
   { label: '业委会治理', value: 'COMMITTEE_GOVERN' },
   { label: '政府监管', value: 'SUPERVISION' },
-  { label: '本地生活商户', value: 'LOCAL_SERVICE' }
+  { label: '服务商-本地生活', value: 'LOCAL_SERVICE' }
+]
+
+const directRelationTypeOptions = [
+  { label: '政府管辖', value: 'JURISDICTION' },
+  { label: '政府监管', value: 'SUPERVISION' },
+  { label: '居委会治理', value: 'NEIGHBORHOOD_GOVERN' },
+  { label: '业委会治理', value: 'COMMITTEE_GOVERN' }
 ]
 
 const landingStats = [
@@ -71,14 +80,15 @@ const trustFoundations = [
 
 const registrationRoles = [
   { title: '小区/业委会', desc: '小区建档、业委会入驻、业主大会与公共收益治理', action: 'community', tenantType: 'COMMITTEE' },
-  { title: '物业公司', desc: '收费、报修、公告、服务评价和运营数据接入', action: 'tenant', tenantType: 'PROPERTY' },
-  { title: '街道/居委会', desc: '网格治理、居民议事、矛盾调解、物业协同与风险督办', action: 'tenant', tenantType: 'GOVERNMENT' },
-  { title: '银行机构', desc: '代收、监管账户、对账、放款和回调验签', action: 'tenant', tenantType: 'BANK' },
+  { title: '物业服务商', desc: '收费、报修、公告、服务评价和运营数据接入，进小区需居委会审批', action: 'tenant', tenantType: 'PROPERTY' },
+  { title: '社区居委会', desc: '党建引领、网格治理、居民议事、矛盾调解、关爱走访与资源联动', action: 'tenant', tenantType: 'NEIGHBORHOOD' },
+  { title: '银行服务商', desc: '代收、监管账户、对账、放款和回调验签，进小区需居委会审批', action: 'tenant', tenantType: 'BANK' },
   { title: '住户', desc: '账号注册、实名房屋绑定、缴费、投票和服务请求', action: 'resident', tenantType: 'OWNER' },
-  { title: '社区商户', desc: '餐饮、零售、家政、维修、养老托育和团购服务入驻', action: 'tenant', tenantType: 'MERCHANT' }
+  { title: '本地服务商', desc: '餐饮、零售、家政、维修、养老托育和团购服务，进小区需居委会审批', action: 'tenant', tenantType: 'MERCHANT' }
 ]
 
 const committeeFeatures = [
+  { title: '党建引领治理', text: '党组织、支部活动、党员先锋岗、红色议事厅和党建联席会纳入居委会治理台账。' },
   { title: '社情民意上报', text: '居民随手拍、语音文字、位置上传，诉求自动进入居委会/网格员待办。' },
   { title: '网格巡查闭环', text: '网格员签到、巡查、事件受理、派单、处置、超时预警和考核留痕。' },
   { title: '居民议事协商', text: '议题征集、方案公示、会议记录、线上表决、结果公开和后续监督。' },
@@ -90,6 +100,7 @@ const committeeFeatures = [
 ]
 
 const committeeWorkflow = [
+  '党建引领',
   '居民说事',
   '网格受理',
   '居委会研判',
@@ -98,8 +109,8 @@ const committeeWorkflow = [
 ]
 
 const committeeMetrics = [
-  { value: '5步', label: '民意到反馈闭环' },
-  { value: '8类', label: '居委会可承接事项' },
+  { value: '6步', label: '党建引领到反馈闭环' },
+  { value: '9类', label: '居委会可承接事项' },
   { value: 'N方', label: '驻区单位与社会力量' }
 ]
 
@@ -153,16 +164,17 @@ const platformPrinciples = [
 ]
 
 const onboardingSteps = [
-  { step: '01', title: '选择主体', text: '物业、政府、业委会、银行、住户按身份提交资料' },
+  { step: '01', title: '选择主体', text: '物业、银行、本地服务商、业委会、住户按身份提交资料，政府/街道由平台直接绑定小区' },
   { step: '02', title: '围绕小区', text: '把主体挂接到小区，形成服务、监管、金融和住户关系' },
   { step: '03', title: '授权开通', text: '按数据域授予读取、写入、审批、导出等权限' },
   { step: '04', title: '生态接入', text: '通过 API 和运营台接 GIS、租售、快递、餐饮、商户与便民服务' }
 ]
 
 const roleNav: Record<string, NavKey[]> = {
-  ADMIN: ['dashboard', 'screen', 'communities', 'billing', 'revenue', 'expenses', 'votes', 'repairs', 'finance', 'banking', 'registrations', 'acceptance', 'audit'],
-  GOVERNMENT: ['dashboard', 'screen', 'communities', 'revenue', 'expenses', 'finance', 'banking', 'registrations', 'acceptance', 'audit'],
-  STREET: ['dashboard', 'screen', 'communities', 'revenue', 'expenses', 'finance', 'banking', 'registrations', 'acceptance'],
+  ADMIN: ['dashboard', 'screen', 'neighborhood', 'communities', 'billing', 'revenue', 'expenses', 'votes', 'repairs', 'finance', 'banking', 'registrations', 'acceptance', 'audit'],
+  GOVERNMENT: ['dashboard', 'screen', 'neighborhood', 'communities', 'revenue', 'expenses', 'finance', 'banking', 'registrations', 'acceptance', 'audit'],
+  STREET: ['dashboard', 'screen', 'neighborhood', 'communities', 'revenue', 'expenses', 'finance', 'banking', 'registrations', 'acceptance'],
+  NEIGHBORHOOD: ['neighborhood', 'communities', 'repairs', 'votes', 'registrations'],
   COMMITTEE: ['dashboard', 'communities', 'revenue', 'expenses', 'votes', 'repairs', 'finance'],
   PROPERTY: ['dashboard', 'communities', 'billing', 'revenue', 'repairs'],
   BANK: ['banking', 'revenue'],
@@ -235,6 +247,66 @@ const announcementForm = ref({
   title: '公共收益月度公示',
   content: '本月公共收益收支明细已完成核对，请业主在业主端查看。'
 })
+const neighborhoodCaseForm = ref({
+  communityId: 1,
+  caseType: 'PUBLIC_OPINION',
+  source: '居民随手拍',
+  title: '楼栋架空层堆物清理',
+  description: '居民反映架空层堆物影响通行和消防安全，需居委会牵头物业、楼栋长和志愿者协同处理。',
+  gridName: '阳光社区一网格',
+  location: '1栋架空层',
+  targetParty: '物业/楼栋长/志愿队',
+  priority: 'HIGH',
+  handler: '网格员王敏',
+  dueAt: '2026-06-06T18:00:00'
+})
+const neighborhoodStatusForm = ref({
+  status: 'COORDINATING',
+  eventSummary: '已联系责任方协同处置，纳入居委会督办台账。',
+  handler: '居委会经办人'
+})
+const neighborhoodCareForm = ref({
+  communityId: 1,
+  personName: '陈爷爷',
+  personType: '独居老人',
+  phoneMask: '136****7788',
+  buildingRoom: '3栋3单元1203',
+  careNeed: '慢病随访、餐食配送、夏季用电安全提醒',
+  riskLevel: 'HIGH',
+  lastVisitAt: '2026-06-01T10:00:00',
+  nextVisitAt: '2026-06-08T10:00:00',
+  status: 'PLANNED',
+  handler: '网格员陈晨'
+})
+const neighborhoodResourceForm = ref({
+  communityId: 1,
+  resourceType: 'VOLUNTEER',
+  organizationName: '邻里互助志愿服务队',
+  contactName: '周队长',
+  contactPhone: '138****6601',
+  serviceScope: '助老探访、文明劝导、公益活动和应急支援',
+  status: 'ACTIVE'
+})
+const neighborhoodPartyForm = ref({
+  communityId: 1,
+  activityType: 'PARTY_BRANCH_MEETING',
+  partyBranch: '阳光社区党委第一党支部',
+  title: '物业服务提升党建联席会',
+  organizer: '居委会李主任',
+  participantCount: 24,
+  partyMemberCount: 12,
+  activityAt: '2026-06-06T09:30:00',
+  status: 'PLANNED',
+  summary: '党组织牵头居委会、物业、业委会、党员楼栋长和居民代表，围绕物业服务、商户准入和公共收益公开形成协商清单。'
+})
+const wechatNoticeForm = ref({
+  communityId: 1,
+  receiverRole: 'OWNER',
+  templateCode: 'COMMUNITY_GOVERNANCE_NOTICE',
+  sponsor: '阳光社区居民委员会',
+  title: '社区治理微信通知',
+  content: '党建引领社区治理，物业服务提升联席会结果将在业主端同步公示，请居民关注。'
+})
 const replyDialogVisible = ref(false)
 const selectedWorkOrder = ref<AnyRow | null>(null)
 const workOrderReply = ref({
@@ -305,13 +377,13 @@ const tenantRegistrationPresets: Record<string, Partial<typeof tenantRegistratio
     adminUsername: 'property_admin_new',
     adminDisplayName: '物业机构管理员'
   },
-  GOVERNMENT: {
+  NEIGHBORHOOD: {
     tenantName: '新入驻社区居民委员会',
     unifiedCreditCode: '',
     contactName: '居委会经办人',
-    contactPhone: '13800000002',
-    adminUsername: 'committee_gov_new',
-    adminDisplayName: '社区治理经办员'
+    contactPhone: '13800000006',
+    adminUsername: 'neighborhood_new',
+    adminDisplayName: '居委会经办员'
   },
   COMMITTEE: {
     tenantName: '新小区业主委员会',
@@ -330,29 +402,31 @@ const tenantRegistrationPresets: Record<string, Partial<typeof tenantRegistratio
     adminDisplayName: '银行经办员'
   },
   MERCHANT: {
-    tenantName: '新入驻社区商户',
+    tenantName: '新入驻本地服务商',
     unifiedCreditCode: '91420100MCHNEW001',
-    contactName: '商户负责人',
+    contactName: '服务商负责人',
     contactPhone: '13800000005',
     adminUsername: 'merchant_new',
-    adminDisplayName: '商户运营员'
+    adminDisplayName: '服务商运营员'
   }
 }
 const publicRegistrationVisible = ref(false)
 const publicRegistrationMode = ref<PublicRegistrationMode>('tenant')
 const registrationCenterCommunityId = ref(1)
+const neighborhoodTenantOptions = ref<AnyRow[]>([])
 const communityRegistrationForm = ref({
   district: '洪山区',
   street: '关山街道',
   neighborhood: '新城社区',
   name: '新城花园',
   households: 1200,
-  contactPhone: '13800000003'
+  contactPhone: '13800000003',
+  neighborhoodTenantId: undefined as number | undefined
 })
 const relationForm = ref({
   communityId: 1,
-  tenantId: 4,
-  relationType: 'PROPERTY_SERVICE',
+  tenantId: 3,
+  relationType: 'SUPERVISION',
   startDate: '2026-06-01'
 })
 const authorizationForm = ref({
@@ -443,10 +517,11 @@ const roleName = computed(() => ({
   ADMIN: '系统管理员',
   GOVERNMENT: '政府监管员',
   STREET: '街道审核员',
+  NEIGHBORHOOD: '居委会',
   COMMITTEE: '业委会',
   PROPERTY: '物业人员',
   BANK: '银行人员',
-  MERCHANT: '社区商户',
+  MERCHANT: '本地服务商',
   OWNER: '业主'
 }[user.value?.role || ''] || '未登录'))
 const canWriteBilling = computed(() => hasCapability('BILLING', 'WRITE'))
@@ -482,12 +557,17 @@ const fivePartyCommunityStatus = computed(() => {
       status: relations.some((item: AnyRow) => ['SUPERVISION', 'JURISDICTION'].includes(item.relationType)) ? '已监管' : '待授权'
     },
     {
+      party: '社区居委会',
+      owner: relations.find((item: AnyRow) => item.relationType === 'NEIGHBORHOOD_GOVERN')?.tenantName || '待接入',
+      status: relations.some((item: AnyRow) => item.relationType === 'NEIGHBORHOOD_GOVERN') ? '已治理' : '待授权'
+    },
+    {
       party: '银行',
       owner: relations.find((item: AnyRow) => item.relationType?.startsWith('BANK_'))?.tenantName || '待开通',
       status: relations.some((item: AnyRow) => item.relationType?.startsWith('BANK_')) ? '已开通' : '待申请'
     },
     {
-      party: '社区商户',
+      party: '本地服务商',
       owner: relations.find((item: AnyRow) => item.relationType === 'LOCAL_SERVICE')?.tenantName || '待入驻',
       status: relations.some((item: AnyRow) => item.relationType === 'LOCAL_SERVICE') ? '已上架' : '待授权'
     },
@@ -552,6 +632,11 @@ async function load() {
       data.value.creditRuns = await api('/api/supervision/credit-runs').catch(() => [])
       data.value.screenTopics = await api('/api/supervision/screen/topics').catch(() => [])
     }
+    if (active.value === 'neighborhood') {
+      data.value.communities = data.value.communities || await api('/api/communities')
+      data.value.neighborhoodWorkbench = await api('/api/neighborhood/workbench')
+      data.value.messages = await api('/api/messages').catch(() => [])
+    }
     if (active.value === 'communities') {
       data.value.communities = await api('/api/communities')
       data.value.houses = await api('/api/houses')
@@ -608,6 +693,14 @@ async function load() {
     }
     if (active.value === 'registrations') {
       data.value.registrations = await api('/api/registrations/pending')
+      await loadNeighborhoodTenantOptions()
+      if (user.value?.role === 'NEIGHBORHOOD') {
+        data.value.communities = data.value.communities || await api('/api/communities')
+        data.value.registrationCommunityOptions = data.value.communities
+        data.value.tenants = []
+        data.value.authorizations = []
+        return
+      }
       data.value.tenants = await api('/api/tenants')
       data.value.communities = data.value.communities || await api('/api/communities')
       data.value.registrationCommunityOptions = data.value.communities
@@ -1063,6 +1156,76 @@ async function createAnnouncement() {
   await load()
 }
 
+async function createNeighborhoodCase() {
+  const result = await api<AnyRow>('/api/neighborhood/cases', {
+    method: 'POST',
+    body: JSON.stringify(neighborhoodCaseForm.value)
+  })
+  ElMessage.success(`居委会事项已建档：${result.caseNo}`)
+  await load()
+}
+
+async function updateNeighborhoodCase(row: AnyRow, status?: string) {
+  const result = await api<AnyRow>(`/api/neighborhood/cases/${row.id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ...neighborhoodStatusForm.value,
+      status: status || neighborhoodStatusForm.value.status,
+      handler: neighborhoodStatusForm.value.handler || row.handler,
+      eventSummary: neighborhoodStatusForm.value.eventSummary || `事项状态更新为 ${status || neighborhoodStatusForm.value.status}`
+    })
+  })
+  ElMessage.success(`事项已流转：${result.status}`)
+  await load()
+}
+
+async function createNeighborhoodCareVisit() {
+  const result = await api<AnyRow>('/api/neighborhood/care-visits', {
+    method: 'POST',
+    body: JSON.stringify(neighborhoodCareForm.value)
+  })
+  ElMessage.success(`关爱走访已入账：#${result.visitId}`)
+  await load()
+}
+
+async function createNeighborhoodResource() {
+  const result = await api<AnyRow>('/api/neighborhood/resources', {
+    method: 'POST',
+    body: JSON.stringify(neighborhoodResourceForm.value)
+  })
+  ElMessage.success(`协同资源已入库：#${result.resourceId}`)
+  await load()
+}
+
+async function createNeighborhoodPartyActivity() {
+  const result = await api<AnyRow>('/api/neighborhood/party-activities', {
+    method: 'POST',
+    body: JSON.stringify(neighborhoodPartyForm.value)
+  })
+  ElMessage.success(`党建活动已入账：${result.activityNo}`)
+  await load()
+}
+
+async function sendWechatNotice() {
+  const result = await api<AnyRow>('/api/messages/wechat', {
+    method: 'POST',
+    body: JSON.stringify(wechatNoticeForm.value)
+  })
+  ElMessage.success(`微信治理通知已发送：#${result.messageId}`)
+  await load()
+}
+
+async function downloadNeighborhoodCsv() {
+  const blob = await apiBlob('/api/neighborhood/export')
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '居委会治理事项台账.csv'
+  link.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('居委会台账已导出')
+}
+
 function openReplyDialog(row: AnyRow) {
   selectedWorkOrder.value = row
   workOrderReply.value = {
@@ -1183,6 +1346,10 @@ async function submitTenantRegistration() {
 }
 
 async function submitCommunityRegistration() {
+  if (!communityRegistrationForm.value.neighborhoodTenantId) {
+    ElMessage.error('请先选择所属居委会')
+    return
+  }
   const result = await api<AnyRow>('/api/registrations/communities', {
     method: 'POST',
     body: JSON.stringify(communityRegistrationForm.value)
@@ -1192,13 +1359,22 @@ async function submitCommunityRegistration() {
   if (session.token) await load()
 }
 
-function openPublicRegistration(mode: PublicRegistrationMode, tenantType = 'PROPERTY') {
+async function loadNeighborhoodTenantOptions() {
+  neighborhoodTenantOptions.value = await api<AnyRow[]>('/api/registrations/neighborhood-options').catch(() => [])
+  if (!communityRegistrationForm.value.neighborhoodTenantId && neighborhoodTenantOptions.value.length) {
+    communityRegistrationForm.value.neighborhoodTenantId = Number(neighborhoodTenantOptions.value[0].tenantId)
+  }
+}
+
+async function openPublicRegistration(mode: PublicRegistrationMode, tenantType = 'PROPERTY') {
   publicRegistrationMode.value = mode
   if (mode === 'tenant') {
     Object.assign(tenantRegistrationForm.value, {
       tenantType,
       adminPassword: 'admin123'
     }, tenantRegistrationPresets[tenantType] || tenantRegistrationPresets.PROPERTY)
+  } else {
+    await loadNeighborhoodTenantOptions()
   }
   publicRegistrationVisible.value = true
 }
@@ -1317,7 +1493,7 @@ async function createBankConfig() {
     method: 'POST',
     body: JSON.stringify(bankConfigForm.value)
   })
-  ElMessage.success('银行服务配置已保存')
+  ElMessage.success('已审批银行服务配置已保存')
   data.value.bankConfigs = await api('/api/bank/configs')
   await refreshBankWorkbench()
 }
@@ -1422,6 +1598,9 @@ async function submitRelationApplication() {
   if (relationApplicationForm.value.relationType === 'SUPERVISION') {
     relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'HOUSE', 'BILLING', 'BANK_FLOW', 'PUBLIC_REVENUE', 'EXPENSE', 'COMPLAINT', 'REPAIR', 'VOTE']
     relationApplicationForm.value.permissions = ['READ', 'APPROVE']
+  } else if (relationApplicationForm.value.relationType === 'NEIGHBORHOOD_GOVERN') {
+    relationApplicationForm.value.dataScopes = ['COMMUNITY_GOVERNANCE', 'COMMUNITY_PROFILE', 'HOUSE', 'RESIDENT', 'REPAIR', 'COMPLAINT', 'VOTE']
+    relationApplicationForm.value.permissions = ['READ', 'WRITE', 'APPROVE', 'EXPORT']
   } else if (relationApplicationForm.value.relationType === 'COMMITTEE_GOVERN') {
     relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'PUBLIC_REVENUE', 'EXPENSE', 'VOTE', 'REPAIR', 'COMPLAINT', 'BANK_FLOW']
     relationApplicationForm.value.permissions = ['READ', 'APPROVE']
@@ -1694,7 +1873,7 @@ onMounted(async () => {
         <button @click="scrollToLanding('committee')">居委会抓手</button>
         <button @click="scrollToLanding('registration')">入驻中心</button>
         <button @click="scrollToLanding('resident-app')">住户端</button>
-        <button @click="scrollToLanding('merchant')">商户入驻</button>
+        <button @click="scrollToLanding('merchant')">服务商入驻</button>
         <button @click="scrollToLanding('ecosystem')">生态接入</button>
       </nav>
       <el-button type="primary" @click="scrollToLanding('login')">登录管理端</el-button>
@@ -1704,10 +1883,10 @@ onMounted(async () => {
       <div class="hero-media" :style="{ backgroundImage: `url(${heroImage})` }"></div>
       <div class="hero-content">
         <h1>小区为中心的五方共治与社区生态平台</h1>
-        <p>把物业公司、政府街道、业主委员会、银行与住户统一接入一个数字底座；再让社区商户、GIS、可信房屋、快递、餐饮、便民服务、IoT 安防按小区授权接入。</p>
+        <p>以党建引领居委会治理，把物业公司、政府街道、业主委员会、银行服务商与住户统一接入一个数字底座；再让本地服务商、GIS、可信房屋、快递、餐饮、便民服务、IoT 安防按小区授权接入。</p>
         <div class="hero-actions">
           <el-button type="primary" size="large" @click="scrollToLanding('registration')">立即入驻</el-button>
-          <el-button size="large" plain @click="openPublicRegistration('tenant', 'MERCHANT')">商户入驻</el-button>
+          <el-button size="large" plain @click="openPublicRegistration('tenant', 'MERCHANT')">服务商入驻</el-button>
           <el-button size="large" plain @click="scrollToLanding('login')">登录管理端</el-button>
         </div>
         <div class="landing-stats">
@@ -1730,7 +1909,7 @@ onMounted(async () => {
             <el-input v-model="password" type="password" size="large" show-password />
           </el-form-item>
           <el-button type="primary" size="large" class="login-button" @click="doLogin">登录系统</el-button>
-          <div class="demo-users">演示账号：admin / gov / street / committee / property / bank，密码均为 admin123。</div>
+          <div class="demo-users">演示账号：admin / gov / street / neighborhood / committee / property / bank，密码均为 admin123。</div>
         </el-form>
       </section>
     </section>
@@ -1739,7 +1918,7 @@ onMounted(async () => {
       <section id="policy" class="landing-section">
         <div class="landing-section-head">
           <h2>把政策落到居委会，把政府管理落到小区</h2>
-          <p>居委会是政府联系居民、组织自治、协调物业矛盾和动员社会力量的基层抓手。SPARK Nexus 把这个抓手数字化，让街道社区不是旁观者，而是小区治理的牵引者。</p>
+          <p>坚持党建引领基层治理，居委会是政府联系居民、组织自治、协调物业矛盾和动员社会力量的基层抓手。SPARK Nexus 把这个抓手数字化，让街道社区不是旁观者，而是小区治理的牵引者。</p>
         </div>
         <div class="policy-grid">
           <article v-for="item in policyCards" :key="item.title">
@@ -1752,9 +1931,12 @@ onMounted(async () => {
       <section id="committee" class="landing-section committee-section">
         <div class="committee-brief">
           <h2>居委会工作台：让政府管理有入口、有台账、有闭环</h2>
-          <p>把“居民找谁说、社区怎么办、物业谁来协调、部门如何协同、结果如何公开”做成标准流程。居委会不是多一个账号，而是整个平台的基层治理中枢。</p>
+          <p>把“党组织如何牵头、居民找谁说、社区怎么办、物业谁来协调、部门如何协同、结果如何公开”做成标准流程。居委会不是多一个账号，而是整个平台的基层治理中枢。</p>
           <div class="committee-flow">
-            <span v-for="item in committeeWorkflow" :key="item">{{ item }}</span>
+            <span v-for="(item, index) in committeeWorkflow" :key="item">
+              <small>0{{ index + 1 }}</small>
+              <strong>{{ item }}</strong>
+            </span>
           </div>
           <div class="committee-metrics">
             <article v-for="item in committeeMetrics" :key="item.label">
@@ -1774,7 +1956,7 @@ onMounted(async () => {
       <section id="registration" class="landing-section registration-section">
         <div class="landing-section-head">
           <h2>居委会牵引五方治理主体入驻，商户生态再上架</h2>
-          <p>先建小区主档，再让街道社区、居委会、物业、业委会、银行、住户和社区商户按角色入驻，所有权限都围绕小区、事项和数据域授权。</p>
+          <p>先建小区主档，政府/街道由平台直接绑定监管或管辖小区；小区备案、物业服务商、银行服务商、本地服务商进入小区服务体系，都由所属居委会审批后授权。</p>
         </div>
         <div class="registration-entry-grid">
           <button v-for="item in registrationRoles" :key="item.title" @click="item.action === 'community' ? openPublicRegistration('community') : item.action === 'resident' ? openResidentRegistrationHint() : openPublicRegistration('tenant', item.tenantType)">
@@ -1804,10 +1986,10 @@ onMounted(async () => {
 
       <section id="merchant" class="landing-section merchant-section">
         <div class="merchant-copy">
-          <h2>商户入驻：不是发广告，是进小区服务体系</h2>
-          <p>餐饮、零售、家政、维修、养老托育、房屋服务都可以接进来，但必须先完成主体资质、服务范围、小区授权和投诉评价闭环。住户看到的是可信服务，物业和政府看到的是可监管运营。</p>
+          <h2>服务商入驻：不是发广告，是进小区服务体系</h2>
+          <p>银行、物业、餐饮、零售、家政、维修、养老托育、房屋服务都可以接进来，但必须先完成主体资质、服务范围、居委会审批、小区授权和投诉评价闭环。住户看到的是可信服务，物业和政府看到的是可监管运营。</p>
           <div class="hero-actions merchant-actions">
-            <el-button type="primary" size="large" @click="openPublicRegistration('tenant', 'MERCHANT')">申请商户入驻</el-button>
+            <el-button type="primary" size="large" @click="openPublicRegistration('tenant', 'MERCHANT')">申请本地服务商入驻</el-button>
             <el-button size="large" plain @click="scrollToLanding('ecosystem')">查看生态能力</el-button>
           </div>
         </div>
@@ -1908,6 +2090,11 @@ onMounted(async () => {
         </el-form-item>
         <el-form-item label="社区">
           <el-input v-model="communityRegistrationForm.neighborhood" />
+        </el-form-item>
+        <el-form-item label="所属居委会">
+          <el-select v-model="communityRegistrationForm.neighborhoodTenantId" placeholder="选择负责初审的居委会">
+            <el-option v-for="item in neighborhoodTenantOptions" :key="item.tenantId" :label="item.tenantName" :value="item.tenantId" />
+          </el-select>
         </el-form-item>
         <el-form-item label="小区名称">
           <el-input v-model="communityRegistrationForm.name" />
@@ -2018,7 +2205,7 @@ onMounted(async () => {
               <el-table-column label="操作" width="90"><template #default="{ row }"><el-button size="small" @click="openCreditFactors(row)">因子</el-button></template></el-table-column>
             </el-table>
           </section>
-          <div class="dashboard-grid">
+          <div v-if="user.role !== 'NEIGHBORHOOD'" class="dashboard-grid">
             <section class="panel">
               <div class="panel-head"><h2>信用评分规则</h2><span>版本化权重与扣分公式</span><el-button size="small" type="primary" @click="downloadCreditRulesCsv">导出规则</el-button></div>
               <el-table :data="data.creditRules" height="240">
@@ -2124,6 +2311,314 @@ onMounted(async () => {
                 </div>
               </section>
             </div>
+          </section>
+        </template>
+
+        <template v-if="active === 'neighborhood' && data.neighborhoodWorkbench">
+          <div class="metric-grid">
+            <article v-for="metric in data.neighborhoodWorkbench.metrics" :key="metric.label" class="metric-card">
+              <span>{{ metric.label }}</span>
+              <strong>{{ metric.value }}<em>{{ metric.unit }}</em></strong>
+              <small>{{ metric.trend }}</small>
+            </article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel wide">
+              <div class="panel-head">
+                <h2>居委会事项建档</h2>
+                <span>居民诉求、网格巡查、议事协商、矛盾调解</span>
+                <el-button type="primary" @click="createNeighborhoodCase">建档</el-button>
+                <el-button @click="downloadNeighborhoodCsv">导出台账</el-button>
+              </div>
+              <el-form class="inline-form" label-position="top">
+                <el-form-item label="小区">
+                  <el-select v-model="neighborhoodCaseForm.communityId">
+                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="类型">
+                  <el-select v-model="neighborhoodCaseForm.caseType">
+                    <el-option label="社情民意" value="PUBLIC_OPINION" />
+                    <el-option label="网格巡查" value="GRID_INSPECTION" />
+                    <el-option label="居民议事" value="RESIDENT_COUNCIL" />
+                    <el-option label="居务公开" value="AFFAIRS_DISCLOSURE" />
+                    <el-option label="关爱服务" value="CARE_SERVICE" />
+                    <el-option label="物业调解" value="PROPERTY_MEDIATION" />
+                    <el-option label="资源联动" value="RESOURCE_LINKAGE" />
+                    <el-option label="一张图治理" value="GOVERNANCE_MAP" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="来源">
+                  <el-input v-model="neighborhoodCaseForm.source" />
+                </el-form-item>
+                <el-form-item label="标题">
+                  <el-input v-model="neighborhoodCaseForm.title" />
+                </el-form-item>
+                <el-form-item label="网格">
+                  <el-input v-model="neighborhoodCaseForm.gridName" />
+                </el-form-item>
+                <el-form-item label="位置">
+                  <el-input v-model="neighborhoodCaseForm.location" />
+                </el-form-item>
+                <el-form-item label="协同方">
+                  <el-input v-model="neighborhoodCaseForm.targetParty" />
+                </el-form-item>
+                <el-form-item label="优先级">
+                  <el-segmented v-model="neighborhoodCaseForm.priority" :options="[{ label: '高', value: 'HIGH' }, { label: '普通', value: 'NORMAL' }]" />
+                </el-form-item>
+                <el-form-item label="处理人">
+                  <el-input v-model="neighborhoodCaseForm.handler" />
+                </el-form-item>
+                <el-form-item label="截止时间">
+                  <el-input v-model="neighborhoodCaseForm.dueAt" />
+                </el-form-item>
+                <el-form-item label="描述" class="full">
+                  <el-input v-model="neighborhoodCaseForm.description" type="textarea" :rows="3" />
+                </el-form-item>
+              </el-form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>事项流转</h2><span>状态、经办人与办理记录</span></div>
+              <el-form label-position="top">
+                <el-form-item label="状态">
+                  <el-select v-model="neighborhoodStatusForm.status">
+                    <el-option label="受理" value="PROCESSING" />
+                    <el-option label="协同" value="COORDINATING" />
+                    <el-option label="闭环" value="CLOSED" />
+                    <el-option label="取消" value="CANCELLED" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="经办人">
+                  <el-input v-model="neighborhoodStatusForm.handler" />
+                </el-form-item>
+                <el-form-item label="记录">
+                  <el-input v-model="neighborhoodStatusForm.eventSummary" type="textarea" :rows="4" />
+                </el-form-item>
+              </el-form>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-head"><h2>治理事项台账</h2><span>从居民说事到公开反馈</span></div>
+            <el-table :data="data.neighborhoodWorkbench.cases" height="320">
+              <el-table-column prop="communityName" label="小区" width="140" />
+              <el-table-column prop="caseNo" label="编号" width="150" />
+              <el-table-column prop="caseType" label="类型" width="130" />
+              <el-table-column prop="title" label="事项" min-width="190" />
+              <el-table-column prop="gridName" label="网格" width="140" />
+              <el-table-column prop="targetParty" label="协同方" min-width="150" />
+              <el-table-column label="优先级" width="90"><template #default="{ row }"><el-tag :type="row.priority === 'HIGH' ? 'danger' : 'info'">{{ row.priority }}</el-tag></template></el-table-column>
+              <el-table-column label="状态" width="110"><template #default="{ row }"><el-tag :type="statusType(row.status)">{{ row.status }}</el-tag></template></el-table-column>
+              <el-table-column prop="handler" label="处理人" width="120" />
+              <el-table-column prop="dueAt" label="截止时间" width="170" />
+              <el-table-column label="操作" width="210"><template #default="{ row }"><el-button size="small" @click="updateNeighborhoodCase(row, 'COORDINATING')">协同</el-button><el-button size="small" type="success" @click="updateNeighborhoodCase(row, 'CLOSED')">闭环</el-button></template></el-table-column>
+            </el-table>
+          </section>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>党建引领</h2><span>支部活动、党员服务、红色议事、党建联席</span><el-button type="primary" @click="createNeighborhoodPartyActivity">入账</el-button></div>
+              <el-form label-position="top">
+                <el-form-item label="小区">
+                  <el-select v-model="neighborhoodPartyForm.communityId">
+                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="类型">
+                  <el-select v-model="neighborhoodPartyForm.activityType">
+                    <el-option label="支部会议" value="PARTY_BRANCH_MEETING" />
+                    <el-option label="党员先锋服务" value="PARTY_MEMBER_SERVICE" />
+                    <el-option label="红色议事厅" value="RED_COUNCIL" />
+                    <el-option label="党建联席会" value="PARTY_JOINT_MEETING" />
+                    <el-option label="主题党日" value="THEME_PARTY_DAY" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="党组织/支部">
+                  <el-input v-model="neighborhoodPartyForm.partyBranch" />
+                </el-form-item>
+                <el-form-item label="活动标题">
+                  <el-input v-model="neighborhoodPartyForm.title" />
+                </el-form-item>
+                <el-form-item label="组织人">
+                  <el-input v-model="neighborhoodPartyForm.organizer" />
+                </el-form-item>
+                <el-form-item label="参与人数">
+                  <el-input-number v-model="neighborhoodPartyForm.participantCount" :min="0" />
+                </el-form-item>
+                <el-form-item label="党员人数">
+                  <el-input-number v-model="neighborhoodPartyForm.partyMemberCount" :min="0" />
+                </el-form-item>
+                <el-form-item label="活动时间">
+                  <el-input v-model="neighborhoodPartyForm.activityAt" />
+                </el-form-item>
+                <el-form-item label="状态">
+                  <el-segmented v-model="neighborhoodPartyForm.status" :options="[{ label: '计划', value: 'PLANNED' }, { label: '推进', value: 'PROCESSING' }, { label: '完成', value: 'DONE' }]" />
+                </el-form-item>
+                <el-form-item label="纪要" class="full">
+                  <el-input v-model="neighborhoodPartyForm.summary" type="textarea" :rows="3" />
+                </el-form-item>
+              </el-form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>党建台账</h2><span>{{ data.neighborhoodWorkbench.partyActivities?.length || 0 }} 项</span></div>
+              <el-table :data="data.neighborhoodWorkbench.partyActivities" height="360">
+                <el-table-column prop="activityType" label="类型" width="140" />
+                <el-table-column prop="partyBranch" label="党组织" min-width="190" />
+                <el-table-column prop="title" label="事项" min-width="190" />
+                <el-table-column prop="organizer" label="组织人" width="120" />
+                <el-table-column prop="partyMemberCount" label="党员" width="80" />
+                <el-table-column prop="participantCount" label="参与" width="80" />
+                <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="statusType(row.status)">{{ row.status }}</el-tag></template></el-table-column>
+                <el-table-column prop="activityAt" label="时间" width="170" />
+              </el-table>
+            </section>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>微信治理通知</h2><span>政府/居委会背书的居民触达</span><el-button type="primary" @click="sendWechatNotice">发送</el-button></div>
+              <el-form label-position="top">
+                <el-form-item label="小区">
+                  <el-select v-model="wechatNoticeForm.communityId">
+                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="接收角色">
+                  <el-select v-model="wechatNoticeForm.receiverRole">
+                    <el-option label="住户" value="OWNER" />
+                    <el-option label="物业服务商" value="PROPERTY" />
+                    <el-option label="业委会" value="COMMITTEE" />
+                    <el-option label="本地服务商" value="MERCHANT" />
+                    <el-option label="银行服务商" value="BANK" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="模板">
+                  <el-select v-model="wechatNoticeForm.templateCode">
+                    <el-option label="社区治理通知" value="COMMUNITY_GOVERNANCE_NOTICE" />
+                    <el-option label="议事协商提醒" value="RESIDENT_COUNCIL_REMINDER" />
+                    <el-option label="党建活动提醒" value="PARTY_ACTIVITY_NOTICE" />
+                    <el-option label="服务商准入公示" value="SERVICE_PROVIDER_REVIEW_NOTICE" />
+                    <el-option label="应急风险提示" value="EMERGENCY_RISK_NOTICE" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="发起主体">
+                  <el-input v-model="wechatNoticeForm.sponsor" />
+                </el-form-item>
+                <el-form-item label="标题">
+                  <el-input v-model="wechatNoticeForm.title" />
+                </el-form-item>
+                <el-form-item label="内容" class="full">
+                  <el-input v-model="wechatNoticeForm.content" type="textarea" :rows="4" />
+                </el-form-item>
+              </el-form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>通知台账</h2><span>站内、短信、微信触达留痕</span></div>
+              <el-table :data="data.messages || []" height="360">
+                <el-table-column prop="title" label="标题" min-width="180" />
+                <el-table-column prop="receiverRole" label="接收" width="90" />
+                <el-table-column prop="channel" label="渠道" width="120" />
+                <el-table-column prop="status" label="状态" width="90" />
+                <el-table-column prop="content" label="内容" min-width="260" />
+                <el-table-column prop="createdAt" label="时间" width="170" />
+              </el-table>
+            </section>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>重点人群关爱</h2><span>走访、提醒、转介</span><el-button type="primary" @click="createNeighborhoodCareVisit">入账</el-button></div>
+              <el-form label-position="top">
+                <el-form-item label="小区">
+                  <el-select v-model="neighborhoodCareForm.communityId">
+                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="姓名/类型">
+                  <el-input v-model="neighborhoodCareForm.personName" />
+                </el-form-item>
+                <el-form-item label="对象类型">
+                  <el-select v-model="neighborhoodCareForm.personType">
+                    <el-option label="独居老人" value="独居老人" />
+                    <el-option label="困境儿童" value="困境儿童" />
+                    <el-option label="残障居民" value="残障居民" />
+                    <el-option label="困难家庭" value="困难家庭" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="房号">
+                  <el-input v-model="neighborhoodCareForm.buildingRoom" />
+                </el-form-item>
+                <el-form-item label="风险">
+                  <el-segmented v-model="neighborhoodCareForm.riskLevel" :options="[{ label: '高', value: 'HIGH' }, { label: '中', value: 'MEDIUM' }, { label: '低', value: 'LOW' }]" />
+                </el-form-item>
+                <el-form-item label="下次走访">
+                  <el-input v-model="neighborhoodCareForm.nextVisitAt" />
+                </el-form-item>
+                <el-form-item label="关爱需求">
+                  <el-input v-model="neighborhoodCareForm.careNeed" type="textarea" :rows="3" />
+                </el-form-item>
+              </el-form>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>驻区资源联动</h2><span>医院、警务、志愿队、商户</span><el-button type="primary" @click="createNeighborhoodResource">入库</el-button></div>
+              <el-form label-position="top">
+                <el-form-item label="小区">
+                  <el-select v-model="neighborhoodResourceForm.communityId">
+                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="类型">
+                  <el-select v-model="neighborhoodResourceForm.resourceType">
+                    <el-option label="医疗" value="MEDICAL" />
+                    <el-option label="警务" value="POLICE" />
+                    <el-option label="志愿者" value="VOLUNTEER" />
+                    <el-option label="商户" value="MERCHANT" />
+                    <el-option label="部门" value="DEPARTMENT" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="组织">
+                  <el-input v-model="neighborhoodResourceForm.organizationName" />
+                </el-form-item>
+                <el-form-item label="联系人">
+                  <el-input v-model="neighborhoodResourceForm.contactName" />
+                </el-form-item>
+                <el-form-item label="电话">
+                  <el-input v-model="neighborhoodResourceForm.contactPhone" />
+                </el-form-item>
+                <el-form-item label="服务范围">
+                  <el-input v-model="neighborhoodResourceForm.serviceScope" type="textarea" :rows="3" />
+                </el-form-item>
+              </el-form>
+            </section>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>走访台账</h2><span>{{ data.neighborhoodWorkbench.careVisits?.length || 0 }} 条</span></div>
+              <el-table :data="data.neighborhoodWorkbench.careVisits" height="260">
+                <el-table-column prop="personName" label="姓名" />
+                <el-table-column prop="personType" label="类型" />
+                <el-table-column prop="buildingRoom" label="房号" />
+                <el-table-column label="风险"><template #default="{ row }"><el-tag :type="row.riskLevel === 'HIGH' ? 'danger' : row.riskLevel === 'MEDIUM' ? 'warning' : 'success'">{{ row.riskLevel }}</el-tag></template></el-table-column>
+                <el-table-column prop="nextVisitAt" label="下次走访" width="170" />
+                <el-table-column prop="handler" label="处理人" />
+              </el-table>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>资源库</h2><span>{{ data.neighborhoodWorkbench.resources?.length || 0 }} 个</span></div>
+              <el-table :data="data.neighborhoodWorkbench.resources" height="260">
+                <el-table-column prop="resourceType" label="类型" width="100" />
+                <el-table-column prop="organizationName" label="组织" min-width="180" />
+                <el-table-column prop="contactName" label="联系人" />
+                <el-table-column prop="serviceScope" label="服务范围" min-width="260" />
+              </el-table>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-head"><h2>办理轨迹</h2><span>事项流转记录</span></div>
+            <el-table :data="data.neighborhoodWorkbench.events" height="260">
+              <el-table-column prop="caseNo" label="编号" width="150" />
+              <el-table-column prop="title" label="事项" min-width="180" />
+              <el-table-column prop="eventType" label="事件" width="120" />
+              <el-table-column prop="operator" label="操作人" width="120" />
+              <el-table-column prop="eventSummary" label="记录" min-width="260" />
+              <el-table-column prop="createdAt" label="时间" width="170" />
+            </el-table>
           </section>
         </template>
 
@@ -2831,14 +3326,14 @@ onMounted(async () => {
               </el-form>
             </section>
             <section v-if="canManageBankConfig" class="panel">
-              <div class="panel-head"><h2>银行服务配置</h2><span>小区代收、监管账户服务</span></div>
+              <div class="panel-head"><h2>已审批银行服务配置</h2><span>银行服务商经居委会审批后配置代收、监管账户服务</span></div>
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="bankConfigForm.communityId">
                     <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="银行机构">
+                <el-form-item label="银行服务商">
                   <el-select v-model="bankConfigForm.bankTenantId">
                     <el-option v-for="item in (data.tenants || []).filter((tenant: AnyRow) => tenant.tenantType === 'BANK')" :key="item.id" :label="item.tenantName" :value="item.id" />
                   </el-select>
@@ -2849,7 +3344,7 @@ onMounted(async () => {
                 <el-form-item label="商户号/监管编号">
                   <el-input v-model="bankConfigForm.merchantNo" />
                 </el-form-item>
-                <el-button type="primary" @click="createBankConfig">保存配置</el-button>
+                <el-button type="primary" @click="createBankConfig">保存已审批配置</el-button>
               </el-form>
             </section>
             <section class="panel">
@@ -2961,8 +3456,8 @@ onMounted(async () => {
         <template v-if="active === 'registrations'">
           <section class="panel">
             <div class="panel-head">
-              <h2>小区中心五方+商户注册</h2>
-              <span>围绕一个小区挂接物业、政府、业委会、银行、住户与社区商户</span>
+              <h2>小区中心治理与服务商准入</h2>
+              <span>政府直接绑定监管小区，物业、银行和本地服务商进入小区都由居委会审批</span>
               <div class="actions">
                 <el-select v-model="registrationCenterCommunityId" class="tenant-switch" @change="changeRegistrationCommunity">
                   <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
@@ -2977,9 +3472,9 @@ onMounted(async () => {
               </article>
             </div>
           </section>
-          <div class="dashboard-grid">
+          <div v-if="user.role !== 'NEIGHBORHOOD'" class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>主体入驻</h2><span>物业、政府、业委会、银行、商户先成为平台机构</span></div>
+              <div class="panel-head"><h2>主体入驻</h2><span>物业、居委会、业委会、银行服务商、本地服务商先成为平台机构</span></div>
               <el-form label-position="top">
                 <el-form-item label="机构类型">
                   <el-segmented v-model="tenantRegistrationForm.tenantType" :options="tenantTypeOptions" />
@@ -3009,7 +3504,7 @@ onMounted(async () => {
               </el-form>
             </section>
             <section class="panel">
-              <div class="panel-head"><h2>小区/业委会建档</h2><span>先形成小区主档，再挂接五方与商户关系</span></div>
+              <div class="panel-head"><h2>小区/业委会建档</h2><span>小区备案直接绑定所属居委会，由居委会审批</span></div>
               <el-form label-position="top">
                 <el-form-item label="行政区">
                   <el-input v-model="communityRegistrationForm.district" />
@@ -3019,6 +3514,11 @@ onMounted(async () => {
                 </el-form-item>
                 <el-form-item label="社区">
                   <el-input v-model="communityRegistrationForm.neighborhood" />
+                </el-form-item>
+                <el-form-item label="所属居委会">
+                  <el-select v-model="communityRegistrationForm.neighborhoodTenantId" placeholder="选择负责初审的居委会">
+                    <el-option v-for="item in neighborhoodTenantOptions" :key="item.tenantId" :label="item.tenantName" :value="item.tenantId" />
+                  </el-select>
                 </el-form-item>
                 <el-form-item label="小区名称">
                   <el-input v-model="communityRegistrationForm.name" />
@@ -3033,9 +3533,9 @@ onMounted(async () => {
               </el-form>
             </section>
           </div>
-          <div class="dashboard-grid">
+          <div v-if="user.role !== 'NEIGHBORHOOD'" class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>挂接小区服务关系</h2><span>物业、政府、业委会围绕当前小区授权</span></div>
+              <div class="panel-head"><h2>提交小区服务关系</h2><span>服务商进小区走申请，所属居委会审批后授权</span></div>
               <el-form label-position="top">
                 <el-form-item label="机构">
                   <el-select v-model="relationApplicationForm.tenantId">
@@ -3078,7 +3578,7 @@ onMounted(async () => {
               </el-form>
             </section>
           </div>
-          <div class="dashboard-grid">
+          <div v-if="user.role !== 'NEIGHBORHOOD'" class="dashboard-grid">
             <section class="panel">
               <div class="panel-head"><h2>当前小区已挂接主体</h2><span>治理关系、商户服务与授权的主线视图</span></div>
               <el-table :data="registrationCommunityRelations" height="300">
@@ -3115,7 +3615,7 @@ onMounted(async () => {
               </el-table-column>
             </el-table>
           </section>
-          <section class="panel">
+          <section v-if="user.role !== 'NEIGHBORHOOD'" class="panel">
             <div class="panel-head"><h2>数据授权</h2><span>租户、小区、数据范围、动作</span><el-button size="small" @click="downloadAuthorizationsCsv">导出台账</el-button></div>
             <el-table :data="data.authorizations" height="320">
               <el-table-column prop="communityName" label="小区" />
@@ -3130,8 +3630,8 @@ onMounted(async () => {
               </el-table-column>
             </el-table>
           </section>
-          <section class="panel">
-            <div class="panel-head"><h2>机构用户</h2><span>为物业、银行、政府机构创建管理员</span></div>
+          <section v-if="user.role !== 'NEIGHBORHOOD'" class="panel">
+            <div class="panel-head"><h2>机构用户</h2><span>为物业、银行、居委会等机构创建管理员</span></div>
             <el-form class="inline-form" label-position="top">
               <el-form-item label="机构">
                 <el-select v-model="tenantUserForm.tenantId" @change="loadTenantUsers">
@@ -3153,8 +3653,9 @@ onMounted(async () => {
                   <el-option label="银行人员" value="BANK" />
                   <el-option label="政府监管" value="GOVERNMENT" />
                   <el-option label="街道审核" value="STREET" />
+                  <el-option label="居委会" value="NEIGHBORHOOD" />
                   <el-option label="业委会" value="COMMITTEE" />
-                  <el-option label="社区商户" value="MERCHANT" />
+                  <el-option label="本地服务商" value="MERCHANT" />
                 </el-select>
               </el-form-item>
               <el-button type="primary" @click="createTenantUser">创建/绑定用户</el-button>
@@ -3171,9 +3672,9 @@ onMounted(async () => {
               </el-table-column>
             </el-table>
           </section>
-          <div class="dashboard-grid">
+          <div v-if="user.role !== 'NEIGHBORHOOD'" class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>小区机构关系</h2><span>物业、政府、银行、商户与小区多对多绑定</span></div>
+              <div class="panel-head"><h2>治理关系直绑</h2><span>只用于政府、居委会、业委会等治理关系；服务商走申请审批</span></div>
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="relationForm.communityId" @change="loadCommunityRelations">
@@ -3187,13 +3688,7 @@ onMounted(async () => {
                 </el-form-item>
                 <el-form-item label="关系类型">
                   <el-select v-model="relationForm.relationType">
-                    <el-option label="物业服务" value="PROPERTY_SERVICE" />
-                    <el-option label="政府管辖" value="JURISDICTION" />
-                    <el-option label="政府监管" value="SUPERVISION" />
-                    <el-option label="银行代收" value="BANK_COLLECTION" />
-                    <el-option label="银行监管" value="BANK_SUPERVISION" />
-                    <el-option label="业委会治理" value="COMMITTEE_GOVERN" />
-                    <el-option label="本地生活商户" value="LOCAL_SERVICE" />
+                    <el-option v-for="item in directRelationTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="开始日期">
@@ -3217,7 +3712,7 @@ onMounted(async () => {
               </el-table>
             </section>
           </div>
-          <section class="panel">
+          <section v-if="user.role !== 'NEIGHBORHOOD'" class="panel">
             <div class="panel-head"><h2>新增数据授权</h2><span>控制机构能看什么、能做什么</span></div>
             <el-form class="inline-form" label-position="top">
               <el-form-item label="授权方">
@@ -3240,6 +3735,7 @@ onMounted(async () => {
                   <el-option label="小区档案" value="COMMUNITY_PROFILE" />
                   <el-option label="房屋" value="HOUSE" />
                   <el-option label="住户" value="RESIDENT" />
+                  <el-option label="居委会治理" value="COMMUNITY_GOVERNANCE" />
                   <el-option label="账单" value="BILLING" />
                   <el-option label="支付" value="PAYMENT" />
                   <el-option label="银行流水" value="BANK_FLOW" />

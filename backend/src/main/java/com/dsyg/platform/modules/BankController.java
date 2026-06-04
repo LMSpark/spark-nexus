@@ -3,10 +3,12 @@ package com.dsyg.platform.modules;
 import com.dsyg.platform.auth.AccessControlService;
 import com.dsyg.platform.auth.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -274,6 +276,20 @@ public class BankController {
         requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET");
         TokenService.Principal principal = principal(request);
         access.assertCommunityAccess(principal, body.communityId(), "BANK_FLOW", "WRITE");
+        Integer approvedRelationCount = jdbc.sql("""
+                select count(*) from tenant_community_relation
+                where tenant_id = :bankTenantId
+                  and community_id = :communityId
+                  and relation_type in ('BANK_COLLECTION', 'BANK_SUPERVISION')
+                  and status = 'ACTIVE'
+                """)
+            .param("bankTenantId", body.bankTenantId())
+            .param("communityId", body.communityId())
+            .query(Integer.class)
+            .single();
+        if (approvedRelationCount == null || approvedRelationCount == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "银行绑定小区必须先提交银行服务申请并由所属居委会审批");
+        }
         jdbc.sql("""
                 insert into community_bank_config(community_id, bank_tenant_id, service_type, fund_account_id,
                                                   merchant_no, status, created_at, updated_at)

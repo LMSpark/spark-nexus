@@ -161,7 +161,7 @@ button, input { font: inherit; }
 .policy-grid p, .ecosystem-grid p { margin: 0; color: #607179; font-size: 14px; line-height: 1.7; }
 .committee-section {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(500px, 0.95fr) minmax(0, 1.15fr);
   gap: 26px;
   align-items: stretch;
   background:
@@ -171,6 +171,8 @@ button, input { font: inherit; }
   color: #eaf6f4;
 }
 .committee-brief {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 26px;
   border: 1px solid rgba(156, 217, 211, 0.24);
@@ -189,44 +191,67 @@ button, input { font: inherit; }
   line-height: 1.85;
 }
 .committee-flow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 26px;
+  padding: 12px;
+  border: 1px solid rgba(118, 222, 208, 0.24);
+  border-radius: 8px;
+  background: rgba(6, 39, 42, 0.22);
 }
 .committee-flow span {
   position: relative;
-  min-width: 88px;
-  padding: 10px 12px;
-  border: 1px solid rgba(118, 222, 208, 0.34);
-  border-radius: 8px;
-  background: rgba(86, 212, 198, 0.12);
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 6px;
+  border-right: 1px solid rgba(118, 222, 208, 0.22);
   color: #eafffb;
-  font-size: 13px;
-  font-weight: 800;
   text-align: center;
 }
-.committee-flow span:not(:last-child)::after {
-  content: ">";
-  position: absolute;
-  right: -9px;
-  top: 50%;
-  transform: translateY(-50%);
+.committee-flow span:last-child { border-right: 0; }
+.committee-flow small {
   color: #56d4c6;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.committee-flow strong {
+  color: #f4fffd;
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+.committee-flow span:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-top: 1px solid #56d4c6;
+  border-right: 1px solid #56d4c6;
+  transform: translateY(-50%) rotate(45deg);
+  background: #0b4141;
 }
 .committee-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 28px;
+  margin-top: auto;
+  padding-top: 28px;
 }
 .committee-metrics article {
   min-width: 0;
-  padding: 16px;
+  padding: 18px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
 }
-.committee-metrics strong { display: block; color: #56d4c6; font-size: 26px; }
+.committee-metrics strong { display: block; color: #56d4c6; font-size: 28px; line-height: 1; }
 .committee-metrics span { display: block; margin-top: 6px; color: #cfe2e3; font-size: 13px; line-height: 1.45; }
 .committee-feature-grid {
   min-width: 0;
@@ -236,7 +261,8 @@ button, input { font: inherit; }
 }
 .committee-feature-grid article {
   min-width: 0;
-  padding: 18px;
+  min-height: 126px;
+  padding: 20px;
   border: 1px solid rgba(198, 230, 226, 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
@@ -245,14 +271,15 @@ button, input { font: inherit; }
 .committee-feature-grid h3 {
   margin: 0 0 9px;
   color: #073b3a;
-  font-size: 17px;
+  font-size: 18px;
+  line-height: 1.25;
   letter-spacing: 0;
 }
 .committee-feature-grid p {
   margin: 0;
   color: #607179;
   font-size: 14px;
-  line-height: 1.68;
+  line-height: 1.62;
 }
 .registration-section { background: #0f2d32; border-color: #0f2d32; color: #eaf5f4; }
 .registration-section h2 { color: #fff; }
@@ -767,7 +794,13 @@ button, input { font: inherit; }
   }
   .committee-brief { padding: 22px; }
   .committee-brief h2 { font-size: 24px; }
-  .committee-flow span { flex: 1 1 112px; }
+  .committee-flow { grid-template-columns: 1fr; }
+  .committee-flow span {
+    min-height: 48px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(118, 222, 208, 0.18);
+  }
+  .committee-flow span:last-child { border-bottom: 0; }
   .committee-flow span::after { display: none; }
   .committee-metrics { grid-template-columns: 1fr; }
   .ecosystem-rule-strip { grid-template-columns: 1fr; }

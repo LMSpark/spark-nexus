@@ -281,6 +281,26 @@ public class IntegrationService {
         return result;
     }
 
+    public Map<String, Object> sendWechatCommunityNotice(long communityId, String receiverRole, String templateCode, String title, String content, String sponsor) {
+        Map<String, Object> result = Map.of(
+            "mode", mode,
+            "provider", "WECHAT_MESSAGE",
+            "communityId", communityId,
+            "receiverRole", receiverRole == null || receiverRole.isBlank() ? "OWNER" : receiverRole,
+            "templateCode", templateCode == null || templateCode.isBlank() ? "COMMUNITY_GOVERNANCE_NOTICE" : templateCode,
+            "sponsor", sponsor == null || sponsor.isBlank() ? "社区治理通知" : sponsor,
+            "result", "dev".equals(mode) ? "WECHAT_MESSAGE_DEV_SENT" : "PENDING_REAL_WECHAT_MESSAGE"
+        );
+        logCall(
+            "WECHAT_MESSAGE",
+            "SEND_COMMUNITY_NOTICE",
+            "communityId=" + communityId + ", receiverRole=" + receiverRole + ", template=" + templateCode + ", sponsor=" + sponsor,
+            result + ", title=" + title + ", content=" + content,
+            "SUCCESS"
+        );
+        return result;
+    }
+
     private void logCall(String adapterCode, String operation, String requestSummary, String responseSummary, String status) {
         jdbc.sql("""
             insert into integration_call_log(adapter_code, operation, request_summary, response_summary, status, trace_no, created_at)

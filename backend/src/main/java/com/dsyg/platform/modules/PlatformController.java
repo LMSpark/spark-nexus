@@ -730,7 +730,7 @@ public class PlatformController {
 
     @GetMapping("/communities")
     public List<Community> communities(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = accessControl.allowedCommunityIds(principal, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
@@ -747,7 +747,7 @@ public class PlatformController {
 
     @GetMapping("/houses")
     public List<House> houses(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = accessControl.allowedCommunityIds(principal, "HOUSE", "READ");
         if (communityId != null) {
@@ -2175,7 +2175,7 @@ public class PlatformController {
 
     @GetMapping("/expenses")
     public List<Expense> expenses(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, null, "EXPENSE", "READ");
         if (allowedCommunityIds.isEmpty()) {
             return List.of();
@@ -2192,7 +2192,7 @@ public class PlatformController {
 
     @GetMapping("/approval-rules")
     public List<ApprovalRule> approvalRules(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, communityId, "EXPENSE", "READ");
         if (allowedCommunityIds.isEmpty()) {
             return List.of();
@@ -2829,19 +2829,19 @@ public class PlatformController {
 
     @GetMapping("/repairs")
     public List<WorkOrder> repairs(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "MERCHANT");
         return workOrders("REPAIR", request);
     }
 
     @GetMapping("/complaints")
     public List<WorkOrder> complaints(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "MERCHANT");
         return workOrders("COMPLAINT", request);
     }
 
     @GetMapping("/work-orders/sla-rules")
     public List<WorkOrderSlaRule> workOrderSlaRules(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "MERCHANT");
         return jdbc.sql("""
             select id, order_type orderType, priority, response_hours responseHours, status, created_at createdAt
             from work_order_sla_rule order by order_type, priority
@@ -2960,7 +2960,7 @@ public class PlatformController {
 
     @PostMapping("/work-orders/{workOrderId}/reply")
     public Map<String, Object> replyWorkOrder(@PathVariable long workOrderId, @RequestBody WorkOrderReplyRequest request, HttpServletRequest httpRequest) {
-        requireAnyRole(httpRequest, "ADMIN", "PROPERTY", "COMMITTEE", "MERCHANT");
+        requireAnyRole(httpRequest, "ADMIN", "PROPERTY", "NEIGHBORHOOD", "COMMITTEE", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) httpRequest.getAttribute("principal");
         Long workOrderCommunityId = jdbc.sql("""
             select h.community_id from work_order w join house h on h.id = w.house_id where w.id = :id
@@ -3028,7 +3028,7 @@ public class PlatformController {
 
     @GetMapping("/announcements")
     public List<Announcement> announcements(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT", "OWNER");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, null, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
             return List.of();
@@ -3043,7 +3043,7 @@ public class PlatformController {
 
     @PostMapping("/announcements")
     public Map<String, Object> createAnnouncement(@RequestBody AnnouncementRequest request, HttpServletRequest httpRequest) {
-        requireAnyRole(httpRequest, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY");
+        requireAnyRole(httpRequest, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY");
         TokenService.Principal principal = (TokenService.Principal) httpRequest.getAttribute("principal");
         accessControl.assertCommunityAccess(principal, request.communityId(), "COMMUNITY_PROFILE", "WRITE");
         jdbc.sql("""
@@ -3068,9 +3068,37 @@ public class PlatformController {
         return Map.of("announcementId", id, "status", "PUBLISHED");
     }
 
+    @PostMapping("/messages/wechat")
+    public Map<String, Object> sendWechatGovernanceNotice(@RequestBody WechatNoticeRequest body, HttpServletRequest httpRequest) {
+        requireAnyRole(httpRequest, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) httpRequest.getAttribute("principal");
+        accessControl.assertCommunityAccess(principal, body.communityId(), "COMMUNITY_GOVERNANCE", "WRITE");
+        String receiverRole = normalized(body.receiverRole(), "OWNER");
+        if (!List.of("OWNER", "PROPERTY", "COMMITTEE", "MERCHANT", "BANK").contains(receiverRole)) {
+            receiverRole = "OWNER";
+        }
+        String sponsor = limitedText(textOrDefault(body.sponsor(), defaultGovernanceSponsor(principal)), 64);
+        String title = limitedText(textOrDefault(body.title(), "社区治理通知"), 128);
+        String content = limitedText("【" + sponsor + "】" + textOrDefault(body.content(), "请关注社区治理通知。"), 500);
+        String templateCode = normalized(body.templateCode(), "COMMUNITY_GOVERNANCE_NOTICE");
+        jdbc.sql("""
+            insert into message_notice(community_id, receiver_role, title, content, channel, status, created_at)
+            values(:communityId, :receiverRole, :title, :content, 'WECHAT_GOV', 'SENT', now())
+            """)
+            .param("communityId", body.communityId())
+            .param("receiverRole", receiverRole)
+            .param("title", title)
+            .param("content", content)
+            .update();
+        Long id = jdbc.sql("select max(id) from message_notice").query(Long.class).single();
+        Map<String, Object> adapterResult = integrations.sendWechatCommunityNotice(body.communityId(), receiverRole, templateCode, title, content, sponsor);
+        audit(principal.username(), "发送微信治理通知-" + title, "message_notice", id);
+        return Map.of("messageId", id, "status", "SENT", "channel", "WECHAT_GOV", "adapterResult", adapterResult);
+    }
+
     @GetMapping("/messages")
     public List<MessageNotice> messages(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT", "OWNER");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, communityId, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
@@ -3092,7 +3120,7 @@ public class PlatformController {
 
     @PostMapping("/messages/{messageId}/read")
     public Map<String, Object> markMessageRead(@PathVariable long messageId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT", "OWNER");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         Long communityId = jdbc.sql("select community_id from message_notice where id = :id")
             .param("id", messageId)
@@ -3110,6 +3138,216 @@ public class PlatformController {
             .update();
         audit(principal.username(), "阅读站内消息", "message_notice", messageId);
         return Map.of("messageId", messageId, "status", "READ");
+    }
+
+    @GetMapping("/neighborhood/workbench")
+    public NeighborhoodWorkbench neighborhoodWorkbench(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        List<Long> allowedCommunityIds = scopedCommunityIds(request, communityId, "COMMUNITY_GOVERNANCE", "READ");
+        if (allowedCommunityIds.isEmpty()) {
+            return new NeighborhoodWorkbench(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        }
+        return new NeighborhoodWorkbench(
+            neighborhoodMetrics(allowedCommunityIds),
+            neighborhoodCasesByCommunityIds(allowedCommunityIds),
+            neighborhoodCaseEvents(allowedCommunityIds),
+            neighborhoodCareVisitsByCommunityIds(allowedCommunityIds),
+            neighborhoodResourcesByCommunityIds(allowedCommunityIds),
+            neighborhoodPartyActivitiesByCommunityIds(allowedCommunityIds)
+        );
+    }
+
+    @GetMapping("/neighborhood/cases")
+    public List<NeighborhoodCase> neighborhoodCases(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        List<Long> allowedCommunityIds = scopedCommunityIds(request, communityId, "COMMUNITY_GOVERNANCE", "READ");
+        if (allowedCommunityIds.isEmpty()) {
+            return List.of();
+        }
+        return neighborhoodCasesByCommunityIds(allowedCommunityIds);
+    }
+
+    @PostMapping("/neighborhood/cases")
+    public Map<String, Object> createNeighborhoodCase(@RequestBody NeighborhoodCaseRequest body, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
+        accessControl.assertCommunityAccess(principal, body.communityId(), "COMMUNITY_GOVERNANCE", "WRITE");
+        String caseNo = "NHC-" + LocalDate.now().toString().replace("-", "") + "-" + Math.abs((principal.username() + System.nanoTime()).hashCode());
+        String priority = normalized(body.priority(), "NORMAL");
+        LocalDateTime dueAt = body.dueAt() == null
+            ? LocalDateTime.now().plusHours("HIGH".equals(priority) ? 24 : 72)
+            : body.dueAt();
+        jdbc.sql("""
+            insert into neighborhood_case(community_id, case_no, case_type, source, title, description,
+                                          grid_name, location, target_party, priority, status, handler,
+                                          due_at, closed_at, created_by, created_at, updated_at)
+            values(:communityId, :caseNo, :caseType, :source, :title, :description,
+                   :gridName, :location, :targetParty, :priority, 'PENDING', :handler,
+                   :dueAt, null, :createdBy, now(), now())
+            """)
+            .param("communityId", body.communityId())
+            .param("caseNo", caseNo)
+            .param("caseType", normalized(body.caseType(), "PUBLIC_OPINION"))
+            .param("source", textOrDefault(body.source(), "居委会受理"))
+            .param("title", textOrDefault(body.title(), "未命名治理事项"))
+            .param("description", textOrDefault(body.description(), "待补充事项描述"))
+            .param("gridName", textOrDefault(body.gridName(), "社区网格"))
+            .param("location", textOrDefault(body.location(), "待定位"))
+            .param("targetParty", textOrDefault(body.targetParty(), "居委会"))
+            .param("priority", priority)
+            .param("handler", textOrDefault(body.handler(), principal.username()))
+            .param("dueAt", dueAt)
+            .param("createdBy", principal.username())
+            .update();
+        Long caseId = jdbc.sql("select id from neighborhood_case where case_no = :caseNo")
+            .param("caseNo", caseNo)
+            .query(Long.class)
+            .single();
+        insertNeighborhoodCaseEvent(caseId, "CREATE", principal.username(), "居委会事项建档：" + textOrDefault(body.title(), caseNo));
+        audit(principal.username(), "居委会事项建档-" + textOrDefault(body.title(), caseNo), "neighborhood_case", caseId);
+        return Map.of("caseId", caseId, "caseNo", caseNo, "status", "PENDING");
+    }
+
+    @PostMapping("/neighborhood/cases/{caseId}/status")
+    public Map<String, Object> updateNeighborhoodCaseStatus(@PathVariable long caseId, @RequestBody NeighborhoodCaseStatusRequest body, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
+        Long communityId = neighborhoodCaseCommunityId(caseId);
+        accessControl.assertCommunityAccess(principal, communityId, "COMMUNITY_GOVERNANCE", "APPROVE");
+        String status = normalized(body.status(), "PROCESSING");
+        if ("DONE".equals(status)) {
+            status = "CLOSED";
+        }
+        String handler = textOrDefault(body.handler(), principal.username());
+        jdbc.sql("""
+            update neighborhood_case
+            set status = :status,
+                handler = :handler,
+                closed_at = case when :status = 'CLOSED' then now() else closed_at end,
+                updated_at = now()
+            where id = :caseId
+            """)
+            .param("status", status)
+            .param("handler", handler)
+            .param("caseId", caseId)
+            .update();
+        String summary = textOrDefault(body.eventSummary(), "事项状态更新为 " + status);
+        insertNeighborhoodCaseEvent(caseId, status, principal.username(), summary);
+        audit(principal.username(), "居委会事项流转-" + status, "neighborhood_case", caseId);
+        return Map.of("caseId", caseId, "status", status);
+    }
+
+    @PostMapping("/neighborhood/care-visits")
+    public Map<String, Object> createNeighborhoodCareVisit(@RequestBody NeighborhoodCareVisitRequest body, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
+        accessControl.assertCommunityAccess(principal, body.communityId(), "COMMUNITY_GOVERNANCE", "WRITE");
+        jdbc.sql("""
+            insert into neighborhood_care_visit(community_id, person_name, person_type, phone_mask, building_room,
+                                                care_need, risk_level, last_visit_at, next_visit_at, status, handler,
+                                                created_at, updated_at)
+            values(:communityId, :personName, :personType, :phoneMask, :buildingRoom,
+                   :careNeed, :riskLevel, :lastVisitAt, :nextVisitAt, :status, :handler,
+                   now(), now())
+            """)
+            .param("communityId", body.communityId())
+            .param("personName", textOrDefault(body.personName(), "居民"))
+            .param("personType", textOrDefault(body.personType(), "重点关爱"))
+            .param("phoneMask", textOrDefault(body.phoneMask(), "待补充"))
+            .param("buildingRoom", textOrDefault(body.buildingRoom(), "待补充"))
+            .param("careNeed", textOrDefault(body.careNeed(), "待走访确认"))
+            .param("riskLevel", normalized(body.riskLevel(), "MEDIUM"))
+            .param("lastVisitAt", body.lastVisitAt())
+            .param("nextVisitAt", body.nextVisitAt())
+            .param("status", normalized(body.status(), "PLANNED"))
+            .param("handler", textOrDefault(body.handler(), principal.username()))
+            .update();
+        Long visitId = jdbc.sql("select max(id) from neighborhood_care_visit").query(Long.class).single();
+        audit(principal.username(), "新增重点人群关爱-" + textOrDefault(body.personName(), "居民"), "neighborhood_care_visit", visitId);
+        return Map.of("visitId", visitId, "status", "SAVED");
+    }
+
+    @PostMapping("/neighborhood/resources")
+    public Map<String, Object> createNeighborhoodResource(@RequestBody NeighborhoodResourceRequest body, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
+        accessControl.assertCommunityAccess(principal, body.communityId(), "COMMUNITY_GOVERNANCE", "WRITE");
+        jdbc.sql("""
+            insert into neighborhood_resource(community_id, resource_type, organization_name, contact_name,
+                                              contact_phone, service_scope, status, created_at, updated_at)
+            values(:communityId, :resourceType, :organizationName, :contactName,
+                   :contactPhone, :serviceScope, :status, now(), now())
+            """)
+            .param("communityId", body.communityId())
+            .param("resourceType", normalized(body.resourceType(), "VOLUNTEER"))
+            .param("organizationName", textOrDefault(body.organizationName(), "社区协同资源"))
+            .param("contactName", textOrDefault(body.contactName(), "联系人"))
+            .param("contactPhone", textOrDefault(body.contactPhone(), "待补充"))
+            .param("serviceScope", textOrDefault(body.serviceScope(), "社区治理协同服务"))
+            .param("status", normalized(body.status(), "ACTIVE"))
+            .update();
+        Long resourceId = jdbc.sql("select max(id) from neighborhood_resource").query(Long.class).single();
+        audit(principal.username(), "新增居委会协同资源-" + textOrDefault(body.organizationName(), "社区协同资源"), "neighborhood_resource", resourceId);
+        return Map.of("resourceId", resourceId, "status", "SAVED");
+    }
+
+    @PostMapping("/neighborhood/party-activities")
+    public Map<String, Object> createNeighborhoodPartyActivity(@RequestBody NeighborhoodPartyActivityRequest body, HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "NEIGHBORHOOD");
+        TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
+        accessControl.assertCommunityAccess(principal, body.communityId(), "COMMUNITY_GOVERNANCE", "WRITE");
+        String activityNo = "NPA-" + LocalDate.now().toString().replace("-", "") + "-" + Math.abs((principal.username() + System.nanoTime()).hashCode());
+        jdbc.sql("""
+            insert into neighborhood_party_activity(community_id, activity_no, activity_type, party_branch, title,
+                                                    organizer, participant_count, party_member_count, activity_at,
+                                                    status, summary, created_by, created_at, updated_at)
+            values(:communityId, :activityNo, :activityType, :partyBranch, :title,
+                   :organizer, :participantCount, :partyMemberCount, :activityAt,
+                   :status, :summary, :createdBy, now(), now())
+            """)
+            .param("communityId", body.communityId())
+            .param("activityNo", activityNo)
+            .param("activityType", normalized(body.activityType(), "PARTY_BRANCH_MEETING"))
+            .param("partyBranch", textOrDefault(body.partyBranch(), "社区党组织"))
+            .param("title", textOrDefault(body.title(), "党建引领治理活动"))
+            .param("organizer", textOrDefault(body.organizer(), principal.username()))
+            .param("participantCount", Math.max(0, body.participantCount()))
+            .param("partyMemberCount", Math.max(0, body.partyMemberCount()))
+            .param("activityAt", body.activityAt() == null ? LocalDateTime.now() : body.activityAt())
+            .param("status", normalized(body.status(), "PLANNED"))
+            .param("summary", textOrDefault(body.summary(), "党建引领社区治理活动已入账"))
+            .param("createdBy", principal.username())
+            .update();
+        Long activityId = jdbc.sql("select id from neighborhood_party_activity where activity_no = :activityNo")
+            .param("activityNo", activityNo)
+            .query(Long.class)
+            .single();
+        audit(principal.username(), "新增党建引领活动-" + textOrDefault(body.title(), activityNo), "neighborhood_party_activity", activityId);
+        return Map.of("activityId", activityId, "activityNo", activityNo, "status", "SAVED");
+    }
+
+    @GetMapping("/neighborhood/export")
+    public ResponseEntity<byte[]> exportNeighborhoodCases(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
+        List<NeighborhoodCase> rows = neighborhoodCases(communityId, request);
+        StringBuilder csv = new StringBuilder("小区,事项编号,类型,来源,标题,网格,位置,协同方,优先级,状态,处理人,截止时间,关闭时间,创建时间\n");
+        for (NeighborhoodCase row : rows) {
+            csv.append(csv(row.communityName())).append(',')
+                .append(csv(row.caseNo())).append(',')
+                .append(csv(row.caseType())).append(',')
+                .append(csv(row.source())).append(',')
+                .append(csv(row.title())).append(',')
+                .append(csv(row.gridName())).append(',')
+                .append(csv(row.location())).append(',')
+                .append(csv(row.targetParty())).append(',')
+                .append(csv(row.priority())).append(',')
+                .append(csv(row.status())).append(',')
+                .append(csv(row.handler())).append(',')
+                .append(csv(row.dueAt() == null ? "" : row.dueAt().toString())).append(',')
+                .append(csv(row.closedAt() == null ? "" : row.closedAt().toString())).append(',')
+                .append(csv(row.createdAt() == null ? "" : row.createdAt().toString())).append('\n');
+        }
+        logDataExport(request, "NEIGHBORHOOD_GOVERNANCE", "neighborhood-cases.csv", "neighborhood_case", communityId == null ? 0 : communityId, communityId, rows.size());
+        return csvResponse("neighborhood-cases.csv", csv.toString());
     }
 
     @GetMapping("/finance/vouchers")
@@ -3565,6 +3803,18 @@ public class PlatformController {
     public record AuditLog(long id, String actor, String action, String targetType, long targetId, String hash, String previousHash, LocalDateTime createdAt) {}
     public record AuditVerification(int totalCount, int brokenLinks, long firstBrokenId, String status, String latestHash) {}
     public record DataExportLog(long id, String actor, String roleCode, long tenantId, Long communityId, String exportModule, String targetType, long targetId, String fileName, int rowCount, String dataScope, String filterSummary, String status, LocalDateTime createdAt) {}
+    public record NeighborhoodWorkbench(List<NeighborhoodMetric> metrics, List<NeighborhoodCase> cases, List<NeighborhoodCaseEvent> events, List<NeighborhoodCareVisit> careVisits, List<NeighborhoodResource> resources, List<NeighborhoodPartyActivity> partyActivities) {}
+    public record NeighborhoodMetric(String label, String value, String unit, String trend) {}
+    public record NeighborhoodCase(long id, long communityId, String communityName, String caseNo, String caseType, String source, String title, String description, String gridName, String location, String targetParty, String priority, String status, String handler, LocalDateTime dueAt, LocalDateTime closedAt, String createdBy, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+    public record NeighborhoodCaseEvent(long id, long caseId, String caseNo, String title, String eventType, String operator, String eventSummary, LocalDateTime createdAt) {}
+    public record NeighborhoodCareVisit(long id, long communityId, String communityName, String personName, String personType, String phoneMask, String buildingRoom, String careNeed, String riskLevel, LocalDateTime lastVisitAt, LocalDateTime nextVisitAt, String status, String handler, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+    public record NeighborhoodResource(long id, long communityId, String communityName, String resourceType, String organizationName, String contactName, String contactPhone, String serviceScope, String status, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+    public record NeighborhoodPartyActivity(long id, long communityId, String communityName, String activityNo, String activityType, String partyBranch, String title, String organizer, int participantCount, int partyMemberCount, LocalDateTime activityAt, String status, String summary, String createdBy, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+    public record NeighborhoodCaseRequest(long communityId, String caseType, String source, String title, String description, String gridName, String location, String targetParty, String priority, String handler, LocalDateTime dueAt) {}
+    public record NeighborhoodCaseStatusRequest(String status, String eventSummary, String handler) {}
+    public record NeighborhoodCareVisitRequest(long communityId, String personName, String personType, String phoneMask, String buildingRoom, String careNeed, String riskLevel, LocalDateTime lastVisitAt, LocalDateTime nextVisitAt, String status, String handler) {}
+    public record NeighborhoodResourceRequest(long communityId, String resourceType, String organizationName, String contactName, String contactPhone, String serviceScope, String status) {}
+    public record NeighborhoodPartyActivityRequest(long communityId, String activityType, String partyBranch, String title, String organizer, int participantCount, int partyMemberCount, LocalDateTime activityAt, String status, String summary) {}
     public record FeeStandard(long id, String communityName, long communityId, String feeType, String billingMode, BigDecimal unitPrice, String cycle, LocalDate effectiveFrom, String status, LocalDateTime createdAt) {}
     public record FeeStandardRequest(long communityId, String feeType, String billingMode, BigDecimal unitPrice, String cycle, LocalDate effectiveFrom) {}
     public record BillGenerationRequest(long communityId, String period, LocalDate dueDate) {}
@@ -3613,8 +3863,206 @@ public class PlatformController {
     public record WorkOrderReplyRequest(String status, String reply) {}
     public record WorkOrderEvaluationRequest(int score, String comment) {}
     public record AnnouncementRequest(long communityId, String title, String category, String content) {}
+    public record WechatNoticeRequest(long communityId, String receiverRole, String templateCode, String sponsor, String title, String content) {}
     public record MessageNotice(long id, long communityId, String receiverRole, String title, String content, String channel, String status, String readStatus, LocalDateTime readAt, LocalDateTime createdAt) {}
     public record AlertStatusRequest(String status) {}
+
+    private List<NeighborhoodMetric> neighborhoodMetrics(List<Long> allowedCommunityIds) {
+        Integer total = jdbc.sql("select count(*) from neighborhood_case where community_id in (:allowedCommunityIds)")
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        Integer processing = jdbc.sql("""
+            select count(*) from neighborhood_case
+            where community_id in (:allowedCommunityIds)
+              and status in ('PENDING', 'PROCESSING', 'COORDINATING')
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        Integer closed = jdbc.sql("""
+            select count(*) from neighborhood_case
+            where community_id in (:allowedCommunityIds)
+              and status = 'CLOSED'
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        Integer dueSoon = jdbc.sql("""
+            select count(*) from neighborhood_case
+            where community_id in (:allowedCommunityIds)
+              and status not in ('CLOSED', 'CANCELLED')
+              and due_at is not null
+              and due_at <= date_add(now(), interval 24 hour)
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        Integer careCount = jdbc.sql("""
+            select count(*) from neighborhood_care_visit
+            where community_id in (:allowedCommunityIds)
+              and status in ('PLANNED', 'FOLLOWING')
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        Integer partyCount = jdbc.sql("""
+            select count(*) from neighborhood_party_activity
+            where community_id in (:allowedCommunityIds)
+              and status in ('PLANNED', 'PROCESSING', 'DONE')
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        int totalCases = total == null ? 0 : total;
+        int closedCases = closed == null ? 0 : closed;
+        int closeRate = totalCases == 0 ? 0 : Math.round(closedCases * 100f / totalCases);
+        return List.of(
+            new NeighborhoodMetric("治理事项", String.valueOf(totalCases), "件", "8类居委会事项可入账"),
+            new NeighborhoodMetric("办理中", String.valueOf(processing == null ? 0 : processing), "件", "网格受理到多方协办"),
+            new NeighborhoodMetric("闭环率", String.valueOf(closeRate), "%", "结果公开反馈可留痕"),
+            new NeighborhoodMetric("24小时到期", String.valueOf(dueSoon == null ? 0 : dueSoon), "件", "超期前提醒督办"),
+            new NeighborhoodMetric("关爱对象", String.valueOf(careCount == null ? 0 : careCount), "人", "重点人群走访台账"),
+            new NeighborhoodMetric("党建引领", String.valueOf(partyCount == null ? 0 : partyCount), "项", "支部活动、党员服务、红色议事")
+        );
+    }
+
+    private List<NeighborhoodCase> neighborhoodCasesByCommunityIds(List<Long> allowedCommunityIds) {
+        return jdbc.sql("""
+            select n.id, n.community_id communityId, c.name communityName, n.case_no caseNo,
+                   n.case_type caseType, n.source, n.title, n.description, n.grid_name gridName,
+                   n.location, n.target_party targetParty, n.priority, n.status, n.handler,
+                   n.due_at dueAt, n.closed_at closedAt, n.created_by createdBy,
+                   n.created_at createdAt, n.updated_at updatedAt
+            from neighborhood_case n
+            join community c on c.id = n.community_id
+            where n.community_id in (:allowedCommunityIds)
+            order by case
+              when n.status = 'PENDING' then 1
+              when n.status = 'PROCESSING' then 2
+              when n.status = 'COORDINATING' then 3
+              when n.status = 'CLOSED' then 4
+              else 5
+            end, n.priority desc, n.created_at desc
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(NeighborhoodCase.class)
+            .list();
+    }
+
+    private List<NeighborhoodCaseEvent> neighborhoodCaseEvents(List<Long> allowedCommunityIds) {
+        return jdbc.sql("""
+            select e.id, e.case_id caseId, n.case_no caseNo, n.title, e.event_type eventType,
+                   e.operator, e.event_summary eventSummary, e.created_at createdAt
+            from neighborhood_case_event e
+            join neighborhood_case n on n.id = e.case_id
+            where n.community_id in (:allowedCommunityIds)
+            order by e.created_at desc, e.id desc
+            limit 80
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(NeighborhoodCaseEvent.class)
+            .list();
+    }
+
+    private List<NeighborhoodCareVisit> neighborhoodCareVisitsByCommunityIds(List<Long> allowedCommunityIds) {
+        return jdbc.sql("""
+            select v.id, v.community_id communityId, c.name communityName, v.person_name personName,
+                   v.person_type personType, v.phone_mask phoneMask, v.building_room buildingRoom,
+                   v.care_need careNeed, v.risk_level riskLevel, v.last_visit_at lastVisitAt,
+                   v.next_visit_at nextVisitAt, v.status, v.handler, v.created_at createdAt,
+                   v.updated_at updatedAt
+            from neighborhood_care_visit v
+            join community c on c.id = v.community_id
+            where v.community_id in (:allowedCommunityIds)
+            order by v.risk_level desc, v.next_visit_at, v.updated_at desc
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(NeighborhoodCareVisit.class)
+            .list();
+    }
+
+    private List<NeighborhoodResource> neighborhoodResourcesByCommunityIds(List<Long> allowedCommunityIds) {
+        return jdbc.sql("""
+            select r.id, r.community_id communityId, c.name communityName, r.resource_type resourceType,
+                   r.organization_name organizationName, r.contact_name contactName,
+                   r.contact_phone contactPhone, r.service_scope serviceScope, r.status,
+                   r.created_at createdAt, r.updated_at updatedAt
+            from neighborhood_resource r
+            join community c on c.id = r.community_id
+            where r.community_id in (:allowedCommunityIds)
+            order by r.resource_type, r.organization_name
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(NeighborhoodResource.class)
+            .list();
+    }
+
+    private List<NeighborhoodPartyActivity> neighborhoodPartyActivitiesByCommunityIds(List<Long> allowedCommunityIds) {
+        return jdbc.sql("""
+            select p.id, p.community_id communityId, c.name communityName, p.activity_no activityNo,
+                   p.activity_type activityType, p.party_branch partyBranch, p.title, p.organizer,
+                   p.participant_count participantCount, p.party_member_count partyMemberCount,
+                   p.activity_at activityAt, p.status, p.summary, p.created_by createdBy,
+                   p.created_at createdAt, p.updated_at updatedAt
+            from neighborhood_party_activity p
+            join community c on c.id = p.community_id
+            where p.community_id in (:allowedCommunityIds)
+            order by p.activity_at desc, p.id desc
+            """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(NeighborhoodPartyActivity.class)
+            .list();
+    }
+
+    private Long neighborhoodCaseCommunityId(long caseId) {
+        return jdbc.sql("select community_id from neighborhood_case where id = :caseId")
+            .param("caseId", caseId)
+            .query(Long.class)
+            .optional()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "居委会事项不存在"));
+    }
+
+    private void insertNeighborhoodCaseEvent(long caseId, String eventType, String operator, String summary) {
+        jdbc.sql("""
+            insert into neighborhood_case_event(case_id, event_type, operator, event_summary, created_at)
+            values(:caseId, :eventType, :operator, :summary, now())
+            """)
+            .param("caseId", caseId)
+            .param("eventType", eventType)
+            .param("operator", operator)
+            .param("summary", summary)
+            .update();
+    }
+
+    private String normalized(String value, String fallback) {
+        String text = textOrDefault(value, fallback);
+        return text.trim().toUpperCase().replace(' ', '_');
+    }
+
+    private String textOrDefault(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value.trim();
+    }
+
+    private String limitedText(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        String text = value.trim();
+        return text.length() <= maxLength ? text : text.substring(0, maxLength);
+    }
+
+    private String defaultGovernanceSponsor(TokenService.Principal principal) {
+        return switch (principal.role()) {
+            case "GOVERNMENT" -> "区政府监管部门";
+            case "STREET" -> "街道办事处";
+            case "NEIGHBORHOOD" -> "社区居委会";
+            default -> "社区治理平台";
+        };
+    }
 
     private Long scopedCommunityId(HttpServletRequest request, Long requestedCommunityId) {
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
