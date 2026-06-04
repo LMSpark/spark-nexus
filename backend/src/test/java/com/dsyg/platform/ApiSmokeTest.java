@@ -33,6 +33,13 @@ class ApiSmokeTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void rootRedirectsToFrontend() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isFound())
+            .andExpect(header().string("Location", "http://localhost:5683/"));
+    }
+
+    @Test
     void loginAndDashboardWorkAgainstSeedData() throws Exception {
         String body = mockMvc.perform(post("/api/auth/login")
                 .contentType("application/json")
