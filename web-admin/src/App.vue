@@ -3,6 +3,7 @@ import * as echarts from 'echarts'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, apiBlob, capabilities, login, session, switchTenant } from './api'
+import heroImage from './assets/community-governance-hero.png'
 
 type AnyRow = Record<string, any>
 
@@ -29,13 +30,84 @@ const tenantTypeOptions = [
   { label: '物业公司', value: 'PROPERTY' },
   { label: '政府部门', value: 'GOVERNMENT' },
   { label: '小区业委会', value: 'COMMITTEE' },
-  { label: '银行机构', value: 'BANK' }
+  { label: '银行机构', value: 'BANK' },
+  { label: '社区商户', value: 'MERCHANT' }
 ]
 
 const relationTypeOptions = [
   { label: '物业服务', value: 'PROPERTY_SERVICE' },
   { label: '业委会治理', value: 'COMMITTEE_GOVERN' },
-  { label: '政府监管', value: 'SUPERVISION' }
+  { label: '政府监管', value: 'SUPERVISION' },
+  { label: '本地生活商户', value: 'LOCAL_SERVICE' }
+]
+
+const landingStats = [
+  { value: '5方+商户', label: '小区、物业、政府、业委会、银行、住户与社区商户统一入驻' },
+  { value: '1张图', label: 'GIS、房屋、账户、工单、收益、风险一屏联动' },
+  { value: '1个住户端', label: 'App / 小程序把缴费、报修、投票、租售、快递、餐饮、商户优惠都办完' }
+]
+
+const policyCards = [
+  { title: '基层治理现代化', text: '把小区治理、居民服务、事项协同放到统一数字底座，支撑社区、街道、部门协同。' },
+  { title: '住宅物业管理改进', text: '围绕物业服务公开、业主参与、维修资金和公共收益监管，形成可追溯的治理闭环。' },
+  { title: '民法典业主共同决定', text: '业主大会、业委会、公共收益使用和重大事项表决，通过线上留痕和授权边界降低争议。' },
+  { title: '数字中国与数据要素', text: '用标准接口沉淀房屋、主体、资金、服务和信用数据，给城市治理和社区服务提供可复用能力。' }
+]
+
+const registrationRoles = [
+  { title: '小区/业委会', desc: '小区建档、业委会入驻、业主大会与公共收益治理', action: 'community', tenantType: 'COMMITTEE' },
+  { title: '物业公司', desc: '收费、报修、公告、服务评价和运营数据接入', action: 'tenant', tenantType: 'PROPERTY' },
+  { title: '政府街道', desc: '辖区监管、风险预警、注册审核与信用评分', action: 'tenant', tenantType: 'GOVERNMENT' },
+  { title: '银行机构', desc: '代收、监管账户、对账、放款和回调验签', action: 'tenant', tenantType: 'BANK' },
+  { title: '住户', desc: '账号注册、实名房屋绑定、缴费、投票和服务请求', action: 'resident', tenantType: 'OWNER' },
+  { title: '社区商户', desc: '餐饮、零售、家政、维修、养老托育和团购服务入驻', action: 'tenant', tenantType: 'MERCHANT' }
+]
+
+const ecosystemCapabilities = [
+  { code: 'GIS', title: '小区一张图', text: '接楼栋、房屋、车位、设备、网格、事件热力，把空间位置变成治理入口。' },
+  { code: '房', title: '可信房屋服务', text: '把租售、空置房、经纪机构、合同备案和业主授权放进小区可信服务场景。' },
+  { code: '递', title: '快递驿站', text: '对接快递柜、驿站、到件提醒、异常件和末端配送服务。' },
+  { code: '餐', title: '社区餐饮', text: '接入助老餐、团餐、商户优惠、食品安全公示和居民订单服务。' },
+  { code: '商', title: '商户入驻', text: '商户先提交资质，再绑定小区服务范围，优惠、订单、评价和风控都留在平台内。' },
+  { code: '银', title: '金融与银行', text: '银行代收、资金监管、放款、票据、保险和金融服务围绕小区账户闭环。' },
+  { code: '政', title: '政务协同', text: '街道、社区、住建、市场监管、公安消防等事项可按权限接入。' },
+  { code: '物', title: 'IoT与安防', text: '门禁、电梯、消防、能耗、摄像头、充电桩等设备数据进入风险联动。' }
+]
+
+const residentAppFeatures = [
+  '物业缴费',
+  '报修投诉',
+  '业主投票',
+  '公告消息',
+  '房屋租售',
+  '快递到件',
+  '社区餐饮',
+  '商户优惠',
+  '停车充电',
+  '门禁访客',
+  '便民服务'
+]
+
+const merchantScenarios = [
+  { title: '餐饮零售', text: '小区食堂、早餐店、生鲜团购、便利店和品牌折扣，按小区范围精准上架。' },
+  { title: '到家服务', text: '家政保洁、维修开锁、养老托育、陪诊跑腿，从资质审核到评价都可追溯。' },
+  { title: '房屋服务', text: '租售委托、看房预约、合同备案、搬家保洁，用房屋与业主授权建立可信交易。' },
+  { title: '服务监管', text: '食品安全、价格公示、投诉处理、黑名单和服务评分，接受物业与政府协同监管。' }
+]
+
+const platformPrinciples = [
+  '小区为中心，不以单一物业或单一部门为中心',
+  '五方先入驻，再授权，再协同，数据边界清清楚楚',
+  '公共收益、资金、投票、审批、对账全程留痕',
+  '商户只有在小区授权后提供服务，不做脱离治理底座的流量平台',
+  '住户一个 App / 小程序办完小区生活，平台做秩序、身份、数据和监管底座'
+]
+
+const onboardingSteps = [
+  { step: '01', title: '选择主体', text: '物业、政府、业委会、银行、住户按身份提交资料' },
+  { step: '02', title: '围绕小区', text: '把主体挂接到小区，形成服务、监管、金融和住户关系' },
+  { step: '03', title: '授权开通', text: '按数据域授予读取、写入、审批、导出等权限' },
+  { step: '04', title: '生态接入', text: '通过 API 和运营台接 GIS、租售、快递、餐饮、商户与便民服务' }
 ]
 
 const roleNav: Record<string, NavKey[]> = {
@@ -45,6 +117,7 @@ const roleNav: Record<string, NavKey[]> = {
   COMMITTEE: ['dashboard', 'communities', 'revenue', 'expenses', 'votes', 'repairs', 'finance'],
   PROPERTY: ['dashboard', 'communities', 'billing', 'revenue', 'repairs'],
   BANK: ['banking', 'revenue'],
+  MERCHANT: ['communities', 'repairs'],
   OWNER: []
 }
 
@@ -174,6 +247,48 @@ const tenantRegistrationForm = ref({
   adminPassword: 'admin123',
   adminDisplayName: '物业机构管理员'
 })
+const tenantRegistrationPresets: Record<string, Partial<typeof tenantRegistrationForm.value>> = {
+  PROPERTY: {
+    tenantName: '武汉新城物业服务有限公司',
+    unifiedCreditCode: '91420100NEW000001',
+    contactName: '李经理',
+    contactPhone: '13800000001',
+    adminUsername: 'property_admin_new',
+    adminDisplayName: '物业机构管理员'
+  },
+  GOVERNMENT: {
+    tenantName: '新入驻街道办事处',
+    unifiedCreditCode: '',
+    contactName: '街道经办人',
+    contactPhone: '13800000002',
+    adminUsername: 'gov_new',
+    adminDisplayName: '政府监管经办员'
+  },
+  COMMITTEE: {
+    tenantName: '新小区业主委员会',
+    unifiedCreditCode: '',
+    contactName: '业委会主任',
+    contactPhone: '13800000003',
+    adminUsername: 'committee_new',
+    adminDisplayName: '业委会经办人'
+  },
+  BANK: {
+    tenantName: '新入驻银行支行',
+    unifiedCreditCode: '91420100BANKNEW001',
+    contactName: '银行客户经理',
+    contactPhone: '13800000004',
+    adminUsername: 'bank_new',
+    adminDisplayName: '银行经办员'
+  },
+  MERCHANT: {
+    tenantName: '新入驻社区商户',
+    unifiedCreditCode: '91420100MCHNEW001',
+    contactName: '商户负责人',
+    contactPhone: '13800000005',
+    adminUsername: 'merchant_new',
+    adminDisplayName: '商户运营员'
+  }
+}
 const publicRegistrationVisible = ref(false)
 const publicRegistrationMode = ref<PublicRegistrationMode>('tenant')
 const registrationCenterCommunityId = ref(1)
@@ -282,6 +397,7 @@ const roleName = computed(() => ({
   COMMITTEE: '业委会',
   PROPERTY: '物业人员',
   BANK: '银行人员',
+  MERCHANT: '社区商户',
   OWNER: '业主'
 }[user.value?.role || ''] || '未登录'))
 const canWriteBilling = computed(() => hasCapability('BILLING', 'WRITE'))
@@ -320,6 +436,11 @@ const fivePartyCommunityStatus = computed(() => {
       party: '银行',
       owner: relations.find((item: AnyRow) => item.relationType?.startsWith('BANK_'))?.tenantName || '待开通',
       status: relations.some((item: AnyRow) => item.relationType?.startsWith('BANK_')) ? '已开通' : '待申请'
+    },
+    {
+      party: '社区商户',
+      owner: relations.find((item: AnyRow) => item.relationType === 'LOCAL_SERVICE')?.tenantName || '待入驻',
+      status: relations.some((item: AnyRow) => item.relationType === 'LOCAL_SERVICE') ? '已上架' : '待授权'
     },
     {
       party: '住户',
@@ -1025,27 +1146,20 @@ async function submitCommunityRegistration() {
 function openPublicRegistration(mode: PublicRegistrationMode, tenantType = 'PROPERTY') {
   publicRegistrationMode.value = mode
   if (mode === 'tenant') {
-    tenantRegistrationForm.value.tenantType = tenantType
-    if (tenantType === 'BANK') {
-      tenantRegistrationForm.value.tenantName = '新入驻银行支行'
-      tenantRegistrationForm.value.unifiedCreditCode = '91420100BANKNEW001'
-      tenantRegistrationForm.value.contactName = '银行客户经理'
-      tenantRegistrationForm.value.adminUsername = 'bank_new'
-      tenantRegistrationForm.value.adminDisplayName = '银行经办员'
-    }
-    if (tenantType === 'COMMITTEE') {
-      tenantRegistrationForm.value.tenantName = '新小区业主委员会'
-      tenantRegistrationForm.value.unifiedCreditCode = ''
-      tenantRegistrationForm.value.contactName = '业委会主任'
-      tenantRegistrationForm.value.adminUsername = 'committee_new'
-      tenantRegistrationForm.value.adminDisplayName = '业委会经办人'
-    }
+    Object.assign(tenantRegistrationForm.value, {
+      tenantType,
+      adminPassword: 'admin123'
+    }, tenantRegistrationPresets[tenantType] || tenantRegistrationPresets.PROPERTY)
   }
   publicRegistrationVisible.value = true
 }
 
 function openResidentRegistrationHint() {
   ElMessage.info('住户请在业主端完成账号注册，并提交实名房屋绑定审核')
+}
+
+function scrollToLanding(sectionId: string) {
+  document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function changeRegistrationCommunity() {
@@ -1261,6 +1375,9 @@ async function submitRelationApplication() {
   } else if (relationApplicationForm.value.relationType === 'COMMITTEE_GOVERN') {
     relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'PUBLIC_REVENUE', 'EXPENSE', 'VOTE', 'REPAIR', 'COMPLAINT', 'BANK_FLOW']
     relationApplicationForm.value.permissions = ['READ', 'APPROVE']
+  } else if (relationApplicationForm.value.relationType === 'LOCAL_SERVICE') {
+    relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'HOUSE', 'RESIDENT', 'REPAIR', 'COMPLAINT']
+    relationApplicationForm.value.permissions = ['READ', 'WRITE']
   } else {
     relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'HOUSE', 'BILLING', 'REPAIR', 'COMPLAINT']
     relationApplicationForm.value.permissions = ['READ', 'WRITE']
@@ -1513,32 +1630,156 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="!user" class="login-page">
-    <section class="login-panel">
-      <div>
-        <h1>SPARK Nexus 城市物业治理中枢</h1>
-        <p>政府监管、物业运营、业委会治理、住户服务一体化的城市物业治理中枢</p>
-      </div>
-      <el-form label-position="top" @submit.prevent="doLogin">
-        <el-form-item label="账号">
-          <el-input v-model="username" size="large" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="password" type="password" size="large" show-password />
-        </el-form-item>
-        <el-button type="primary" size="large" class="login-button" @click="doLogin">登录系统</el-button>
-        <div class="demo-users">管理端演示账号：admin / gov / street / committee / property，密码均为 admin123；业主请使用业主端。</div>
-        <div class="public-register-actions">
-          <el-button size="small" @click="openPublicRegistration('community')">小区备案</el-button>
-          <el-button size="small" @click="openPublicRegistration('tenant', 'COMMITTEE')">业委会注册</el-button>
-          <el-button size="small" @click="openPublicRegistration('tenant', 'PROPERTY')">物业注册</el-button>
-          <el-button size="small" @click="openPublicRegistration('tenant', 'GOVERNMENT')">政府注册</el-button>
-          <el-button size="small" @click="openPublicRegistration('tenant', 'BANK')">银行注册</el-button>
-          <el-button size="small" @click="openResidentRegistrationHint">住户注册</el-button>
+  <div v-if="!user" class="landing-page">
+    <header class="landing-nav">
+      <div class="landing-brand">
+        <span class="brand-mark">SN</span>
+        <div>
+          <strong>SPARK Nexus</strong>
+          <small>城市物业治理中枢</small>
         </div>
-      </el-form>
+      </div>
+      <nav>
+        <button @click="scrollToLanding('policy')">国家政策</button>
+        <button @click="scrollToLanding('registration')">入驻中心</button>
+        <button @click="scrollToLanding('resident-app')">住户端</button>
+        <button @click="scrollToLanding('merchant')">商户入驻</button>
+        <button @click="scrollToLanding('ecosystem')">生态接入</button>
+      </nav>
+      <el-button type="primary" @click="scrollToLanding('login')">登录管理端</el-button>
+    </header>
+
+    <section class="landing-hero">
+      <div class="hero-media" :style="{ backgroundImage: `url(${heroImage})` }"></div>
+      <div class="hero-content">
+        <h1>小区为中心的五方共治与社区生态平台</h1>
+        <p>把物业公司、政府街道、业主委员会、银行与住户统一接入一个数字底座；再让社区商户、GIS、可信房屋、快递、餐饮、便民服务、IoT 安防按小区授权接入。</p>
+        <div class="hero-actions">
+          <el-button type="primary" size="large" @click="scrollToLanding('registration')">立即入驻</el-button>
+          <el-button size="large" plain @click="openPublicRegistration('tenant', 'MERCHANT')">商户入驻</el-button>
+          <el-button size="large" plain @click="scrollToLanding('login')">登录管理端</el-button>
+        </div>
+        <div class="landing-stats">
+          <article v-for="item in landingStats" :key="item.value">
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.label }}</span>
+          </article>
+        </div>
+      </div>
+      <section id="login" class="login-panel landing-login-panel">
+        <div>
+          <h2>登录管理端</h2>
+          <p>政府监管、物业运营、业委会治理、银行对账统一工作台</p>
+        </div>
+        <el-form label-position="top" @submit.prevent="doLogin">
+          <el-form-item label="账号">
+            <el-input v-model="username" size="large" />
+          </el-form-item>
+          <el-form-item label="密码">
+            <el-input v-model="password" type="password" size="large" show-password />
+          </el-form-item>
+          <el-button type="primary" size="large" class="login-button" @click="doLogin">登录系统</el-button>
+          <div class="demo-users">演示账号：admin / gov / street / committee / property / bank，密码均为 admin123。</div>
+        </el-form>
+      </section>
     </section>
-    <el-dialog v-model="publicRegistrationVisible" :title="publicRegistrationMode === 'community' ? '小区备案申请' : '五方主体入驻申请'" width="560px">
+
+    <main class="landing-main">
+      <section id="policy" class="landing-section">
+        <div class="landing-section-head">
+          <h2>国家政策牵引下的社区治理数字底座</h2>
+          <p>平台围绕基层治理现代化、住宅物业管理改进、业主共同决定和数字中国建设，把政策要求落到小区、主体、资金、事项和数据授权。</p>
+        </div>
+        <div class="policy-grid">
+          <article v-for="item in policyCards" :key="item.title">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="registration" class="landing-section registration-section">
+        <div class="landing-section-head">
+          <h2>五方治理主体先入驻，商户生态再上架</h2>
+          <p>先建小区主档，再让物业、政府、业委会、银行、住户和社区商户按角色入驻，所有权限都围绕小区和数据域授权。</p>
+        </div>
+        <div class="registration-entry-grid">
+          <button v-for="item in registrationRoles" :key="item.title" @click="item.action === 'community' ? openPublicRegistration('community') : item.action === 'resident' ? openResidentRegistrationHint() : openPublicRegistration('tenant', item.tenantType)">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.desc }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="resident-app" class="landing-section resident-app-section">
+        <div class="resident-app-copy">
+          <h2>住户一个 App / 小程序，办完小区生活</h2>
+          <p>住户不需要在一堆群、表格和线下窗口里来回跑。缴费、报修、投票、公告、快递、餐饮、房屋租售、停车充电、门禁访客、便民服务都可以从同一个入口进入。</p>
+          <div class="resident-feature-grid">
+            <span v-for="item in residentAppFeatures" :key="item">{{ item }}</span>
+          </div>
+        </div>
+        <div class="resident-phone">
+          <div class="phone-top"></div>
+          <h3>住户端</h3>
+          <div class="phone-service-list">
+            <span v-for="item in residentAppFeatures.slice(0, 8)" :key="item">{{ item }}</span>
+          </div>
+          <button @click="openResidentRegistrationHint">住户注册</button>
+        </div>
+      </section>
+
+      <section id="merchant" class="landing-section merchant-section">
+        <div class="merchant-copy">
+          <h2>商户入驻：不是发广告，是进小区服务体系</h2>
+          <p>餐饮、零售、家政、维修、养老托育、房屋服务都可以接进来，但必须先完成主体资质、服务范围、小区授权和投诉评价闭环。住户看到的是可信服务，物业和政府看到的是可监管运营。</p>
+          <div class="hero-actions merchant-actions">
+            <el-button type="primary" size="large" @click="openPublicRegistration('tenant', 'MERCHANT')">申请商户入驻</el-button>
+            <el-button size="large" plain @click="scrollToLanding('ecosystem')">查看生态能力</el-button>
+          </div>
+        </div>
+        <div class="merchant-scenario-grid">
+          <article v-for="item in merchantScenarios" :key="item.title">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="ecosystem" class="landing-section">
+        <div class="landing-section-head">
+          <h2>开放生态接入：什么都能搞，但要有秩序</h2>
+          <p>平台不是把功能堆成孤岛，而是提供身份、房屋、小区、账户、授权、审计、消息和接口规范，让生态服务接得进、管得住、查得到。</p>
+        </div>
+        <div class="ecosystem-grid">
+          <article v-for="item in ecosystemCapabilities" :key="item.title">
+            <span>{{ item.code }}</span>
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="landing-section philosophy-section">
+        <div>
+          <h2>平台理念</h2>
+          <p>SPARK Nexus 做的不是单点工具，而是小区公共事务、商业服务和政府监管之间的可信连接层。</p>
+        </div>
+        <ul>
+          <li v-for="item in platformPrinciples" :key="item">{{ item }}</li>
+        </ul>
+      </section>
+
+      <section class="landing-section onboarding-section">
+        <article v-for="item in onboardingSteps" :key="item.step">
+          <span>{{ item.step }}</span>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.text }}</p>
+        </article>
+      </section>
+    </main>
+
+    <el-dialog v-model="publicRegistrationVisible" :title="publicRegistrationMode === 'community' ? '小区备案申请' : '主体入驻申请'" width="560px">
       <el-form v-if="publicRegistrationMode === 'tenant'" label-position="top">
         <el-form-item label="主体类型">
           <el-segmented v-model="tenantRegistrationForm.tenantType" :options="tenantTypeOptions" />
@@ -2216,7 +2457,7 @@ onMounted(async () => {
 
         <template v-if="active === 'repairs'">
           <div class="dashboard-grid">
-            <section class="panel">
+            <section v-if="user.role !== 'MERCHANT'" class="panel">
               <div class="panel-head"><h2>发布公告</h2><span>同步到业主端与站内消息</span></div>
               <el-form label-position="top">
                 <el-form-item label="小区">
@@ -2256,7 +2497,7 @@ onMounted(async () => {
             <div class="panel-head">
               <h2>报修与投诉</h2>
               <span>业主服务闭环</span>
-              <el-button type="warning" @click="scanWorkOrderSla">扫描 SLA</el-button>
+              <el-button v-if="user.role !== 'MERCHANT'" type="warning" @click="scanWorkOrderSla">扫描 SLA</el-button>
             </div>
             <el-table :data="[...(data.repairs || []), ...(data.complaints || [])]">
               <el-table-column prop="communityName" label="小区" />
@@ -2627,8 +2868,8 @@ onMounted(async () => {
         <template v-if="active === 'registrations'">
           <section class="panel">
             <div class="panel-head">
-              <h2>小区中心五方注册</h2>
-              <span>围绕一个小区挂接物业、政府、业委会、银行、住户</span>
+              <h2>小区中心五方+商户注册</h2>
+              <span>围绕一个小区挂接物业、政府、业委会、银行、住户与社区商户</span>
               <div class="actions">
                 <el-select v-model="registrationCenterCommunityId" class="tenant-switch" @change="changeRegistrationCommunity">
                   <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
@@ -2645,7 +2886,7 @@ onMounted(async () => {
           </section>
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>五方主体入驻</h2><span>物业、政府、业委会、银行先成为平台机构</span></div>
+              <div class="panel-head"><h2>主体入驻</h2><span>物业、政府、业委会、银行、商户先成为平台机构</span></div>
               <el-form label-position="top">
                 <el-form-item label="机构类型">
                   <el-segmented v-model="tenantRegistrationForm.tenantType" :options="tenantTypeOptions" />
@@ -2675,7 +2916,7 @@ onMounted(async () => {
               </el-form>
             </section>
             <section class="panel">
-              <div class="panel-head"><h2>小区/业委会建档</h2><span>先形成小区主档，再挂接五方关系</span></div>
+              <div class="panel-head"><h2>小区/业委会建档</h2><span>先形成小区主档，再挂接五方与商户关系</span></div>
               <el-form label-position="top">
                 <el-form-item label="行政区">
                   <el-input v-model="communityRegistrationForm.district" />
@@ -2746,7 +2987,7 @@ onMounted(async () => {
           </div>
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>当前小区已挂接五方</h2><span>服务关系与授权的主线视图</span></div>
+              <div class="panel-head"><h2>当前小区已挂接主体</h2><span>治理关系、商户服务与授权的主线视图</span></div>
               <el-table :data="registrationCommunityRelations" height="300">
                 <el-table-column prop="tenantName" label="主体" min-width="180" />
                 <el-table-column prop="tenantType" label="类型" />
@@ -2820,6 +3061,7 @@ onMounted(async () => {
                   <el-option label="政府监管" value="GOVERNMENT" />
                   <el-option label="街道审核" value="STREET" />
                   <el-option label="业委会" value="COMMITTEE" />
+                  <el-option label="社区商户" value="MERCHANT" />
                 </el-select>
               </el-form-item>
               <el-button type="primary" @click="createTenantUser">创建/绑定用户</el-button>
@@ -2838,7 +3080,7 @@ onMounted(async () => {
           </section>
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>小区机构关系</h2><span>物业、政府、银行与小区多对多绑定</span></div>
+              <div class="panel-head"><h2>小区机构关系</h2><span>物业、政府、银行、商户与小区多对多绑定</span></div>
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="relationForm.communityId" @change="loadCommunityRelations">
@@ -2858,6 +3100,7 @@ onMounted(async () => {
                     <el-option label="银行代收" value="BANK_COLLECTION" />
                     <el-option label="银行监管" value="BANK_SUPERVISION" />
                     <el-option label="业委会治理" value="COMMITTEE_GOVERN" />
+                    <el-option label="本地生活商户" value="LOCAL_SERVICE" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="开始日期">

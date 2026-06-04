@@ -161,7 +161,7 @@ public class RegistrationController {
 
     @GetMapping("/registrations/community-options")
     public List<CommunityOptionRow> registrationCommunityOptions(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "COMMITTEE", "BANK");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "COMMITTEE", "BANK", "MERCHANT");
         return jdbc.sql("""
                 select id, district, street, neighborhood, name
                 from community
@@ -658,6 +658,7 @@ public class RegistrationController {
             case "BANK" -> "BANK";
             case "GOVERNMENT" -> "GOVERNMENT";
             case "COMMITTEE" -> "COMMITTEE";
+            case "MERCHANT" -> "MERCHANT";
             default -> "PROPERTY";
         };
         Integer exists = jdbc.sql("select count(*) from app_user where username = :username")

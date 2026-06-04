@@ -730,7 +730,7 @@ public class PlatformController {
 
     @GetMapping("/communities")
     public List<Community> communities(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "BANK");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "BANK", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = accessControl.allowedCommunityIds(principal, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
@@ -747,7 +747,7 @@ public class PlatformController {
 
     @GetMapping("/houses")
     public List<House> houses(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = accessControl.allowedCommunityIds(principal, "HOUSE", "READ");
         if (communityId != null) {
@@ -2829,19 +2829,19 @@ public class PlatformController {
 
     @GetMapping("/repairs")
     public List<WorkOrder> repairs(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
         return workOrders("REPAIR", request);
     }
 
     @GetMapping("/complaints")
     public List<WorkOrder> complaints(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
         return workOrders("COMPLAINT", request);
     }
 
     @GetMapping("/work-orders/sla-rules")
     public List<WorkOrderSlaRule> workOrderSlaRules(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT");
         return jdbc.sql("""
             select id, order_type orderType, priority, response_hours responseHours, status, created_at createdAt
             from work_order_sla_rule order by order_type, priority
@@ -2960,7 +2960,7 @@ public class PlatformController {
 
     @PostMapping("/work-orders/{workOrderId}/reply")
     public Map<String, Object> replyWorkOrder(@PathVariable long workOrderId, @RequestBody WorkOrderReplyRequest request, HttpServletRequest httpRequest) {
-        requireAnyRole(httpRequest, "ADMIN", "PROPERTY", "COMMITTEE");
+        requireAnyRole(httpRequest, "ADMIN", "PROPERTY", "COMMITTEE", "MERCHANT");
         TokenService.Principal principal = (TokenService.Principal) httpRequest.getAttribute("principal");
         Long workOrderCommunityId = jdbc.sql("""
             select h.community_id from work_order w join house h on h.id = w.house_id where w.id = :id
@@ -3028,7 +3028,7 @@ public class PlatformController {
 
     @GetMapping("/announcements")
     public List<Announcement> announcements(HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, null, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
             return List.of();
@@ -3070,7 +3070,7 @@ public class PlatformController {
 
     @GetMapping("/messages")
     public List<MessageNotice> messages(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         List<Long> allowedCommunityIds = scopedCommunityIds(request, communityId, "COMMUNITY_PROFILE", "READ");
         if (allowedCommunityIds.isEmpty()) {
@@ -3092,7 +3092,7 @@ public class PlatformController {
 
     @PostMapping("/messages/{messageId}/read")
     public Map<String, Object> markMessageRead(@PathVariable long messageId, HttpServletRequest request) {
-        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "OWNER");
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "COMMITTEE", "PROPERTY", "MERCHANT", "OWNER");
         TokenService.Principal principal = (TokenService.Principal) request.getAttribute("principal");
         Long communityId = jdbc.sql("select community_id from message_notice where id = :id")
             .param("id", messageId)

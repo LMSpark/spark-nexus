@@ -222,6 +222,87 @@ class MultiTenantAcceptanceTest {
     }
 
     @Test
+    void merchantRegistrationAndLocalServiceRelationAreBoundByCommunityAuthorization() throws Exception {
+        String adminToken = login("admin", "admin123");
+        String ownerToken = login("owner", "admin123");
+        String username = "merchant_accept_" + System.currentTimeMillis();
+
+        JsonNode submitResult = postJson("/api/registrations/tenants", "", """
+            {
+              "tenantType": "MERCHANT",
+              "tenantName": "验收社区生活商户",
+              "unifiedCreditCode": "91420100MCHACCEPT01",
+              "contactName": "商户负责人",
+              "contactPhone": "13800009995",
+              "adminUsername": "%s",
+              "adminPassword": "admin123",
+              "adminDisplayName": "验收商户运营员"
+            }
+            """.formatted(username));
+        long applicationId = registrationId(submitResult.get("applicationNo").asText());
+        postJson("/api/registrations/" + applicationId + "/approve", adminToken, "{\"comment\":\"商户准入通过\"}");
+
+        String merchantToken = login(username, "admin123");
+        long merchantTenantId = jdbc.sql("""
+                select r.tenant_id
+                from user_tenant_relation r
+                join app_user u on u.id = r.user_id
+                where u.username = :username and r.role_code = 'MERCHANT'
+                """)
+            .param("username", username)
+            .query(Long.class)
+            .single();
+
+        mockMvc.perform(get("/api/communities").header("Authorization", bearer(merchantToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()", equalTo(0)));
+
+        JsonNode relationResult = postJson("/api/registrations/community-relations", merchantToken, """
+            {
+              "tenantId": %d,
+              "communityId": 1,
+              "relationType": "LOCAL_SERVICE",
+              "startDate": "2026-06-04",
+              "dataScopes": ["COMMUNITY_PROFILE", "HOUSE", "REPAIR", "COMPLAINT"],
+              "permissions": ["READ", "WRITE"]
+            }
+            """.formatted(merchantTenantId));
+        long relationApplicationId = registrationId(relationResult.get("applicationNo").asText());
+        postJson("/api/registrations/" + relationApplicationId + "/approve", adminToken, "{\"comment\":\"本地生活服务通过\"}");
+
+        mockMvc.perform(get("/api/auth/capabilities").header("Authorization", bearer(merchantToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.role", equalTo("MERCHANT")))
+            .andExpect(jsonPath("$.navKeys", hasItems("communities", "repairs")));
+        mockMvc.perform(get("/api/communities").header("Authorization", bearer(merchantToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem(1)));
+        mockMvc.perform(get("/api/houses").header("Authorization", bearer(merchantToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)));
+
+        JsonNode workOrder = postJson("/api/work-orders", ownerToken, """
+            {
+              "orderType": "REPAIR",
+              "title": "验收商户服务工单",
+              "description": "商户协同处理本地生活服务",
+              "priority": "NORMAL"
+            }
+            """);
+        long workOrderId = workOrder.get("workOrderId").asLong();
+        postJson("/api/work-orders/" + workOrderId + "/reply", merchantToken, """
+            {
+              "status": "DONE",
+              "reply": "社区商户已完成上门服务"
+            }
+            """);
+        mockMvc.perform(get("/api/repairs").header("Authorization", bearer(merchantToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem((int) workOrderId)))
+            .andExpect(jsonPath("$[*].reply", hasItem("社区商户已完成上门服务")));
+    }
+
+    @Test
     void paymentRefundCreatesRefundOrderOutboundFlowAndSmsLog() throws Exception {
         String ownerToken = login("owner", "admin123");
         String propertyToken = login("property", "admin123");
