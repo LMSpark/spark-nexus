@@ -1,0 +1,14 @@
+{
+  "name": "SPARK Nexus业主端",
+  "appid": "__UNI__SPARK001",
+  "description": "城市物业治理中枢业主端",
+  "versionName": "0.1.0",
+  "versionCode": "1",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    },
+    "usingComponents": true
+  }
+}

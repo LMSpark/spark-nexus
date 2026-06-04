@@ -1,0 +1,43 @@
+server:
+  port: 8580
+
+spring:
+  application:
+    name: spark-nexus-property-governance
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3806/property_revenue?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:property}
+    password: ${DB_PASSWORD:property123}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+platform:
+  jwt-secret: ${JWT_SECRET:dev-only-change-me}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  security:
+    encryption-key: ${SENSITIVE_ENCRYPTION_KEY:dev-sensitive-key-change-me}
+  integrations:
+    mode: ${INTEGRATION_MODE:dev}
+    callback-max-skew-seconds: ${CALLBACK_MAX_SKEW_SECONDS:300}
+    wechat:
+      mch-id: ${WECHAT_MCH_ID:}
+      app-id: ${WECHAT_APP_ID:}
+      callback-secret: ${WECHAT_CALLBACK_SECRET:}
+    alipay:
+      app-id: ${ALIPAY_APP_ID:}
+      merchant-id: ${ALIPAY_MERCHANT_ID:}
+      private-key: ${ALIPAY_PRIVATE_KEY:}
+      public-key: ${ALIPAY_PUBLIC_KEY:}
+      callback-secret: ${ALIPAY_CALLBACK_SECRET:}
+    bank:
+      base-url: ${BANK_BASE_URL:}
+      merchant-id: ${BANK_MERCHANT_ID:}
+      callback-secret: ${BANK_CALLBACK_SECRET:}
+    sms:
+      provider: ${SMS_PROVIDER:dev}
+      api-key: ${SMS_API_KEY:}
+    identity:
+      provider: ${IDENTITY_PROVIDER:dev}
+      api-key: ${IDENTITY_API_KEY:}

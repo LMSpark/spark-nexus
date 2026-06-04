@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${TEST_DB_URL:${DB_URL:jdbc:mysql://localhost:3806/property_revenue?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}}
+    username: ${TEST_DB_USERNAME:${DB_USERNAME:property}}
+    password: ${TEST_DB_PASSWORD:${DB_PASSWORD:property123}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+
+platform:
+  jwt-secret: test-secret
+  cors:
+    allowed-origins: http://localhost:*,http://127.0.0.1:*
+  security:
+    encryption-key: test-sensitive-key-change-me
+  integrations:
+    mode: dev
+    sms:
+      provider: dev
+    identity:
+      provider: dev

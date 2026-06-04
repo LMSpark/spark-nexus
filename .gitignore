@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+target/
+*.tsbuildinfo
+
+# Local IDE/editor state
+.idea/
+.vscode/
+
+# Runtime logs and local env
+logs/
+*.log
+.env
+
+# Codex/local generated caches
+.codex-*/
+%SystemDrive%/
+
+# Generated media/render outputs
+outputs/
+rendered-v2/
+rendered-v2-pdf/
+宣传片输出/
+交付物/
+*.mp4
+*.wav
+*.mp3
+*.png
+
+# OS noise
+Thumbs.db
+.DS_Store
