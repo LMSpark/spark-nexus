@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: property_revenue
+          MYSQL_USER: property
+          MYSQL_PASSWORD: property123
+          MYSQL_ROOT_PASSWORD: root123456
+          TZ: Asia/Shanghai
+        ports:
+          - 3806:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uproperty -pproperty123"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            web-admin/package-lock.json
+            owner-miniapp/package-lock.json
+
+      - name: Backend tests
+        working-directory: backend
+        run: mvn test
+
+      - name: Install admin dependencies
+        working-directory: web-admin
+        run: npm ci
+
+      - name: Build admin
+        working-directory: web-admin
+        run: npm run build
+
+      - name: Install owner H5 dependencies
+        working-directory: owner-miniapp
+        run: npm ci
+
+      - name: Build owner H5
+        working-directory: owner-miniapp
+        run: npm run build:h5

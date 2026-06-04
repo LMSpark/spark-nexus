@@ -1,0 +1,65 @@
+{
+  "name": "SPARK Nexus",
+  "image": "mcr.microsoft.com/devcontainers/java:1-17-bookworm",
+  "privileged": true,
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    }
+  },
+  "forwardPorts": [
+    8580,
+    5683,
+    5684,
+    3806,
+    6379,
+    9000,
+    9001
+  ],
+  "portsAttributes": {
+    "8580": {
+      "label": "SPARK Nexus Backend API",
+      "onAutoForward": "notify"
+    },
+    "5683": {
+      "label": "SPARK Nexus Admin",
+      "onAutoForward": "openBrowser"
+    },
+    "5684": {
+      "label": "SPARK Nexus Owner H5",
+      "onAutoForward": "notify"
+    },
+    "3806": {
+      "label": "MySQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    },
+    "9000": {
+      "label": "MinIO API",
+      "onAutoForward": "silent"
+    },
+    "9001": {
+      "label": "MinIO Console",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "Vue.volar",
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}

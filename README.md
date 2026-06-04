@@ -52,6 +52,30 @@ npm run dev:h5
 
 访问 `http://localhost:5684`，微信小程序可用 `npm run build:mp-weixin` 后导入微信开发者工具。
 
+## GitHub Codespaces 运行
+
+在 GitHub 仓库页面点击 `Code` -> `Codespaces` -> `Create codespace on main`。
+
+Codespaces 创建完成后，依赖会自动安装，并会启动 MySQL、Redis、MinIO。然后在 Codespaces 终端执行：
+
+```bash
+./scripts/codespaces-start.sh
+```
+
+等待服务启动后访问端口：
+
+- 管理端：`5683`
+- 业主端 H5：`5684`
+- 后端 API：`8580`
+
+也可以执行：
+
+```bash
+./scripts/codespaces-check.sh
+```
+
+检查后端和两个前端代理是否可用。若页面打不开，在 Codespaces 的 `Ports` 面板中确认 `5683`、`5684`、`8580` 已转发并设置为可见。
+
 ## 演示账号
 
 密码均为 `admin123`：
