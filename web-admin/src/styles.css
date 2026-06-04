@@ -28,6 +28,8 @@ button, input { font: inherit; }
 .login-panel p { margin: 0 0 28px; color: #6a7a83; }
 .login-button { width: 100%; }
 .demo-users { margin-top: 14px; color: #7a8990; font-size: 13px; line-height: 1.6; }
+.public-register-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.public-register-actions .el-button { margin-left: 0; }
 
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar {
@@ -78,6 +80,18 @@ button, input { font: inherit; }
 .metric-grid article span { display: block; color: #71828a; font-size: 12px; }
 .metric-grid article strong { display: block; margin-top: 8px; color: #17222b; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
 .metric-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bank-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.registration-party-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.registration-party-grid article {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e3eaed;
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+.registration-party-grid span { display: block; color: #657780; font-size: 13px; }
+.registration-party-grid strong { display: block; margin-top: 8px; color: #17222b; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.registration-party-grid small { display: block; margin-top: 6px; color: #158f84; font-size: 12px; }
 .workflow-template-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .metric-tile { min-width: 0; padding: 12px; border: 1px solid #e3eaed; border-radius: 8px; background: #fbfcfc; }
 .metric-tile strong { display: block; color: #17222b; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
@@ -221,7 +235,7 @@ button, input { font: inherit; }
   .brand { grid-column: 1 / -1; }
   .topbar { height: auto; align-items: flex-start; gap: 12px; padding: 16px; flex-direction: column; }
   .content { padding: 16px; }
-  .metric-grid, .dashboard-grid, .adapter-grid, .audit-proof, .acceptance-summary, .drill-summary, .screen-metrics, .screen-layout, .topic-grid, .workflow-template-strip { grid-template-columns: 1fr; }
+  .metric-grid, .dashboard-grid, .adapter-grid, .audit-proof, .acceptance-summary, .drill-summary, .screen-metrics, .screen-layout, .topic-grid, .workflow-template-strip, .registration-party-grid { grid-template-columns: 1fr; }
   .inline-form, .workflow-node-form { grid-template-columns: 1fr; }
   .search, .tenant-switch { width: 100%; }
 }

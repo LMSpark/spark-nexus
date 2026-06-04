@@ -16,13 +16,27 @@ const nav = [
   ['votes', '投票问卷'],
   ['repairs', '报修投诉'],
   ['finance', '财务凭证'],
-  ['banking', '银行对账'],
+  ['banking', '银行端'],
   ['registrations', '注册审核'],
   ['acceptance', '验收中心'],
   ['audit', '审计日志']
 ] as const
 
 type NavKey = typeof nav[number][0]
+type PublicRegistrationMode = 'tenant' | 'community'
+
+const tenantTypeOptions = [
+  { label: '物业公司', value: 'PROPERTY' },
+  { label: '政府部门', value: 'GOVERNMENT' },
+  { label: '小区业委会', value: 'COMMITTEE' },
+  { label: '银行机构', value: 'BANK' }
+]
+
+const relationTypeOptions = [
+  { label: '物业服务', value: 'PROPERTY_SERVICE' },
+  { label: '业委会治理', value: 'COMMITTEE_GOVERN' },
+  { label: '政府监管', value: 'SUPERVISION' }
+]
 
 const roleNav: Record<string, NavKey[]> = {
   ADMIN: ['dashboard', 'screen', 'communities', 'billing', 'revenue', 'expenses', 'votes', 'repairs', 'finance', 'banking', 'registrations', 'acceptance', 'audit'],
@@ -160,6 +174,9 @@ const tenantRegistrationForm = ref({
   adminPassword: 'admin123',
   adminDisplayName: '物业机构管理员'
 })
+const publicRegistrationVisible = ref(false)
+const publicRegistrationMode = ref<PublicRegistrationMode>('tenant')
+const registrationCenterCommunityId = ref(1)
 const communityRegistrationForm = ref({
   district: '洪山区',
   street: '关山街道',
@@ -264,10 +281,53 @@ const roleName = computed(() => ({
   STREET: '街道审核员',
   COMMITTEE: '业委会',
   PROPERTY: '物业人员',
+  BANK: '银行人员',
   OWNER: '业主'
 }[user.value?.role || ''] || '未登录'))
 const canWriteBilling = computed(() => hasCapability('BILLING', 'WRITE'))
 const canWritePayment = computed(() => hasCapability('PAYMENT', 'WRITE'))
+const canManageBankConfig = computed(() => ['ADMIN', 'GOVERNMENT', 'STREET'].includes(user.value?.role || ''))
+const bankWorkbench = computed(() => data.value.bankWorkbench || {})
+const bankTodos = computed(() => bankWorkbench.value.todos || [])
+const bankCommunitySummaries = computed(() => bankWorkbench.value.communitySummaries || [])
+const communityOptions = computed(() =>
+  (data.value.communities?.length ? data.value.communities : data.value.registrationCommunityOptions) || []
+)
+const selectedRegistrationCommunity = computed(() =>
+  communityOptions.value.find((item: AnyRow) => item.id === registrationCenterCommunityId.value)
+)
+const registrationCommunityRelations = computed(() => data.value.communityRelations || [])
+const fivePartyCommunityStatus = computed(() => {
+  const relations = registrationCommunityRelations.value
+  const pendingApplications = data.value.registrations || []
+  return [
+    {
+      party: '小区/业委会',
+      owner: relations.find((item: AnyRow) => item.relationType === 'COMMITTEE_GOVERN')?.tenantName || selectedRegistrationCommunity.value?.name || '待备案',
+      status: selectedRegistrationCommunity.value ? '已建档' : '待建档'
+    },
+    {
+      party: '物业公司',
+      owner: relations.find((item: AnyRow) => item.relationType === 'PROPERTY_SERVICE')?.tenantName || '待接入',
+      status: relations.some((item: AnyRow) => item.relationType === 'PROPERTY_SERVICE') ? '已授权' : '待申请'
+    },
+    {
+      party: '政府/街道',
+      owner: relations.find((item: AnyRow) => ['SUPERVISION', 'JURISDICTION'].includes(item.relationType))?.tenantName || '待接入',
+      status: relations.some((item: AnyRow) => ['SUPERVISION', 'JURISDICTION'].includes(item.relationType)) ? '已监管' : '待授权'
+    },
+    {
+      party: '银行',
+      owner: relations.find((item: AnyRow) => item.relationType?.startsWith('BANK_'))?.tenantName || '待开通',
+      status: relations.some((item: AnyRow) => item.relationType?.startsWith('BANK_')) ? '已开通' : '待申请'
+    },
+    {
+      party: '住户',
+      owner: `${pendingApplications.filter((item: AnyRow) => item.targetType === 'RESIDENT_HOUSE' && item.targetId).length} 条绑定记录`,
+      status: pendingApplications.some((item: AnyRow) => item.targetType === 'RESIDENT_HOUSE' && item.status === 'PENDING') ? '有待审' : '正常'
+    }
+  ]
+})
 
 function hasCapability(dataScope: string, permissionCode: string) {
   if (user.value?.role === 'ADMIN') return true
@@ -367,7 +427,9 @@ async function load() {
     }
     if (active.value === 'banking') {
       data.value.communities = data.value.communities || await api('/api/communities')
+      data.value.registrationCommunityOptions = data.value.communities?.length ? data.value.communities : await api('/api/registrations/community-options').catch(() => [])
       data.value.tenants = data.value.tenants || await api('/api/tenants').catch(() => [])
+      data.value.bankWorkbench = await api('/api/bank/workbench').catch(() => null)
       data.value.bankAdapters = await api('/api/bank/adapters').catch(() => [])
       data.value.bankConfigs = await api('/api/bank/configs')
       data.value.bankFlows = await api('/api/bank/flows')
@@ -378,10 +440,14 @@ async function load() {
       data.value.registrations = await api('/api/registrations/pending')
       data.value.tenants = await api('/api/tenants')
       data.value.communities = data.value.communities || await api('/api/communities')
+      data.value.registrationCommunityOptions = data.value.communities
       data.value.authorizations = await api('/api/authorizations')
       await loadTenantUsers()
-      if (data.value.communities?.length) {
-        relationForm.value.communityId = relationForm.value.communityId || data.value.communities[0].id
+      if (communityOptions.value.length) {
+        registrationCenterCommunityId.value = registrationCenterCommunityId.value || communityOptions.value[0].id
+        relationForm.value.communityId = registrationCenterCommunityId.value
+        relationApplicationForm.value.communityId = registrationCenterCommunityId.value
+        bankServiceApplicationForm.value.communityId = registrationCenterCommunityId.value
         await loadCommunityRelations()
       }
     }
@@ -942,7 +1008,8 @@ async function submitTenantRegistration() {
     body: JSON.stringify(tenantRegistrationForm.value)
   })
   ElMessage.success(`注册申请已提交：${result.applicationNo}`)
-  await load()
+  publicRegistrationVisible.value = false
+  if (session.token) await load()
 }
 
 async function submitCommunityRegistration() {
@@ -951,7 +1018,41 @@ async function submitCommunityRegistration() {
     body: JSON.stringify(communityRegistrationForm.value)
   })
   ElMessage.success(`小区备案申请已提交：${result.applicationNo}`)
-  await load()
+  publicRegistrationVisible.value = false
+  if (session.token) await load()
+}
+
+function openPublicRegistration(mode: PublicRegistrationMode, tenantType = 'PROPERTY') {
+  publicRegistrationMode.value = mode
+  if (mode === 'tenant') {
+    tenantRegistrationForm.value.tenantType = tenantType
+    if (tenantType === 'BANK') {
+      tenantRegistrationForm.value.tenantName = '新入驻银行支行'
+      tenantRegistrationForm.value.unifiedCreditCode = '91420100BANKNEW001'
+      tenantRegistrationForm.value.contactName = '银行客户经理'
+      tenantRegistrationForm.value.adminUsername = 'bank_new'
+      tenantRegistrationForm.value.adminDisplayName = '银行经办员'
+    }
+    if (tenantType === 'COMMITTEE') {
+      tenantRegistrationForm.value.tenantName = '新小区业主委员会'
+      tenantRegistrationForm.value.unifiedCreditCode = ''
+      tenantRegistrationForm.value.contactName = '业委会主任'
+      tenantRegistrationForm.value.adminUsername = 'committee_new'
+      tenantRegistrationForm.value.adminDisplayName = '业委会经办人'
+    }
+  }
+  publicRegistrationVisible.value = true
+}
+
+function openResidentRegistrationHint() {
+  ElMessage.info('住户请在业主端完成账号注册，并提交实名房屋绑定审核')
+}
+
+async function changeRegistrationCommunity() {
+  relationForm.value.communityId = registrationCenterCommunityId.value
+  relationApplicationForm.value.communityId = registrationCenterCommunityId.value
+  bankServiceApplicationForm.value.communityId = registrationCenterCommunityId.value
+  await loadCommunityRelations()
 }
 
 async function reviewRegistration(row: AnyRow, decision: 'approve' | 'reject') {
@@ -1042,6 +1143,11 @@ async function disableTenantUser(row: AnyRow) {
   await loadTenantUsers()
 }
 
+async function refreshBankWorkbench() {
+  if (active.value !== 'banking') return
+  data.value.bankWorkbench = await api('/api/bank/workbench').catch(() => null)
+}
+
 async function createBankConfig() {
   await api('/api/bank/configs', {
     method: 'POST',
@@ -1049,6 +1155,7 @@ async function createBankConfig() {
   })
   ElMessage.success('银行服务配置已保存')
   data.value.bankConfigs = await api('/api/bank/configs')
+  await refreshBankWorkbench()
 }
 
 async function runReconciliation() {
@@ -1058,6 +1165,7 @@ async function runReconciliation() {
   })
   ElMessage.success(result.status === 'MATCHED' ? '对账平衡' : `对账差异 ¥${money(result.diffAmount)}`)
   data.value.reconciliations = await api('/api/bank/reconciliations')
+  await refreshBankWorkbench()
 }
 
 async function importBankFlow() {
@@ -1070,6 +1178,7 @@ async function importBankFlow() {
     data.value.bankFlows = await api('/api/bank/flows')
     data.value.reconciliations = await api('/api/bank/reconciliations')
   }
+  await refreshBankWorkbench()
 }
 
 async function downloadBankFlowsCsv() {
@@ -1086,6 +1195,7 @@ async function runBankAdapterHealthCheck() {
   const result = await api<AnyRow>('/api/bank/adapters/health-check', { method: 'POST' })
   ElMessage.success(`银行适配器检查完成：${result.passed}/${result.checked} 通过`)
   data.value.bankAdapters = await api('/api/bank/adapters')
+  await refreshBankWorkbench()
 }
 
 async function downloadBankAdapterHealthCsv() {
@@ -1116,6 +1226,7 @@ async function resolveReconciliationDetail(row: AnyRow, handledStatus: 'RESOLVED
   ElMessage.success(handledStatus === 'RESOLVED' ? '差异已处理' : '差异已忽略')
   data.value.reconciliationDetails = await api(`/api/bank/reconciliations/${selectedReconciliation.value.id}/details`)
   data.value.reconciliations = await api('/api/bank/reconciliations')
+  await refreshBankWorkbench()
 }
 
 async function downloadReconciliationDetailsCsv() {
@@ -1140,24 +1251,40 @@ async function processDisbursement(row: AnyRow, decision: 'PAY' | 'RETURN') {
   })
   ElMessage.success(decision === 'PAY' ? `放款成功：${result.bankTraceNo}` : '放款指令已退回')
   await load()
+  await refreshBankWorkbench()
 }
 
 async function submitRelationApplication() {
+  if (relationApplicationForm.value.relationType === 'SUPERVISION') {
+    relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'HOUSE', 'BILLING', 'BANK_FLOW', 'PUBLIC_REVENUE', 'EXPENSE', 'COMPLAINT', 'REPAIR', 'VOTE']
+    relationApplicationForm.value.permissions = ['READ', 'APPROVE']
+  } else if (relationApplicationForm.value.relationType === 'COMMITTEE_GOVERN') {
+    relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'PUBLIC_REVENUE', 'EXPENSE', 'VOTE', 'REPAIR', 'COMPLAINT', 'BANK_FLOW']
+    relationApplicationForm.value.permissions = ['READ', 'APPROVE']
+  } else {
+    relationApplicationForm.value.dataScopes = ['COMMUNITY_PROFILE', 'HOUSE', 'BILLING', 'REPAIR', 'COMPLAINT']
+    relationApplicationForm.value.permissions = ['READ', 'WRITE']
+  }
   const result = await api<AnyRow>('/api/registrations/community-relations', {
     method: 'POST',
     body: JSON.stringify(relationApplicationForm.value)
   })
   ElMessage.success(`小区服务申请已提交：${result.applicationNo}`)
   await load()
+  if (active.value === 'registrations') await loadCommunityRelations()
 }
 
 async function submitBankServiceApplication() {
+  if (user.value?.role === 'BANK' && user.value.tenantId) {
+    bankServiceApplicationForm.value.bankTenantId = user.value.tenantId
+  }
   const result = await api<AnyRow>('/api/registrations/bank-services', {
     method: 'POST',
     body: JSON.stringify(bankServiceApplicationForm.value)
   })
   ElMessage.success(`银行服务申请已提交：${result.applicationNo}`)
   await load()
+  if (active.value === 'registrations') await loadCommunityRelations()
 }
 
 async function sendTestSms() {
@@ -1401,8 +1528,68 @@ onMounted(async () => {
         </el-form-item>
         <el-button type="primary" size="large" class="login-button" @click="doLogin">登录系统</el-button>
         <div class="demo-users">管理端演示账号：admin / gov / street / committee / property，密码均为 admin123；业主请使用业主端。</div>
+        <div class="public-register-actions">
+          <el-button size="small" @click="openPublicRegistration('community')">小区备案</el-button>
+          <el-button size="small" @click="openPublicRegistration('tenant', 'COMMITTEE')">业委会注册</el-button>
+          <el-button size="small" @click="openPublicRegistration('tenant', 'PROPERTY')">物业注册</el-button>
+          <el-button size="small" @click="openPublicRegistration('tenant', 'GOVERNMENT')">政府注册</el-button>
+          <el-button size="small" @click="openPublicRegistration('tenant', 'BANK')">银行注册</el-button>
+          <el-button size="small" @click="openResidentRegistrationHint">住户注册</el-button>
+        </div>
       </el-form>
     </section>
+    <el-dialog v-model="publicRegistrationVisible" :title="publicRegistrationMode === 'community' ? '小区备案申请' : '五方主体入驻申请'" width="560px">
+      <el-form v-if="publicRegistrationMode === 'tenant'" label-position="top">
+        <el-form-item label="主体类型">
+          <el-segmented v-model="tenantRegistrationForm.tenantType" :options="tenantTypeOptions" />
+        </el-form-item>
+        <el-form-item label="主体名称">
+          <el-input v-model="tenantRegistrationForm.tenantName" />
+        </el-form-item>
+        <el-form-item label="统一社会信用代码">
+          <el-input v-model="tenantRegistrationForm.unifiedCreditCode" />
+        </el-form-item>
+        <el-form-item label="联系人">
+          <el-input v-model="tenantRegistrationForm.contactName" />
+        </el-form-item>
+        <el-form-item label="联系电话">
+          <el-input v-model="tenantRegistrationForm.contactPhone" />
+        </el-form-item>
+        <el-form-item label="管理员账号">
+          <el-input v-model="tenantRegistrationForm.adminUsername" />
+        </el-form-item>
+        <el-form-item label="管理员密码">
+          <el-input v-model="tenantRegistrationForm.adminPassword" />
+        </el-form-item>
+        <el-form-item label="管理员姓名">
+          <el-input v-model="tenantRegistrationForm.adminDisplayName" />
+        </el-form-item>
+      </el-form>
+      <el-form v-else label-position="top">
+        <el-form-item label="行政区">
+          <el-input v-model="communityRegistrationForm.district" />
+        </el-form-item>
+        <el-form-item label="街道">
+          <el-input v-model="communityRegistrationForm.street" />
+        </el-form-item>
+        <el-form-item label="社区">
+          <el-input v-model="communityRegistrationForm.neighborhood" />
+        </el-form-item>
+        <el-form-item label="小区名称">
+          <el-input v-model="communityRegistrationForm.name" />
+        </el-form-item>
+        <el-form-item label="户数">
+          <el-input-number v-model="communityRegistrationForm.households" :min="0" :step="100" />
+        </el-form-item>
+        <el-form-item label="联系电话">
+          <el-input v-model="communityRegistrationForm.contactPhone" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="publicRegistrationVisible = false">取消</el-button>
+        <el-button type="primary" @click="publicRegistrationMode === 'community' ? submitCommunityRegistration() : submitTenantRegistration()">提交申请</el-button>
+      </template>
+    </el-dialog>
   </div>
 
   <div v-else class="app-shell">
@@ -2213,6 +2400,63 @@ onMounted(async () => {
         </template>
 
         <template v-if="active === 'banking'">
+          <section v-if="data.bankWorkbench" class="panel">
+            <div class="panel-head">
+              <h2>银行端工作台</h2>
+              <span>以小区为中心汇总代收、对账、放款待办</span>
+            </div>
+            <div class="metric-grid bank-metric-grid">
+              <article class="metric-card">
+                <span>服务小区</span>
+                <strong>{{ bankWorkbench.allowedCommunityCount || 0 }}<em>个</em></strong>
+                <small>{{ bankWorkbench.activeConfigCount || 0 }} 项银行服务已启用</small>
+              </article>
+              <article class="metric-card">
+                <span>今日入账</span>
+                <strong>¥{{ money(bankWorkbench.todayInAmount) }}</strong>
+                <small>今日出账 ¥{{ money(bankWorkbench.todayOutAmount) }}</small>
+              </article>
+              <article class="metric-card">
+                <span>待放款</span>
+                <strong>{{ bankWorkbench.pendingDisbursementCount || 0 }}<em>笔</em></strong>
+                <small>合计 ¥{{ money(bankWorkbench.pendingDisbursementAmount) }}</small>
+              </article>
+              <article class="metric-card">
+                <span>待处理差异</span>
+                <strong>{{ bankWorkbench.openReconciliationDetailCount || 0 }}<em>条</em></strong>
+                <small>{{ bankWorkbench.diffReconciliationCount || 0 }} 笔对账未平</small>
+              </article>
+              <article class="metric-card">
+                <span>适配器预警</span>
+                <strong>{{ bankWorkbench.adapterWarningCount || 0 }}<em>项</em></strong>
+                <small>接口契约、签名、回调、放款配置</small>
+              </article>
+            </div>
+          </section>
+          <div v-if="data.bankWorkbench" class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>银行端待办</h2><span>放款与对账差异优先处理</span></div>
+              <el-table :data="bankTodos" height="260">
+                <el-table-column label="类型" width="120">
+                  <template #default="{ row }"><el-tag :type="row.todoType === 'DISBURSEMENT' ? 'warning' : 'danger'">{{ row.todoType === 'DISBURSEMENT' ? '放款' : '对账' }}</el-tag></template>
+                </el-table-column>
+                <el-table-column prop="communityName" label="小区" min-width="160" />
+                <el-table-column prop="businessNo" label="业务号" min-width="180" />
+                <el-table-column label="金额"><template #default="{ row }">¥{{ money(row.amount) }}</template></el-table-column>
+                <el-table-column label="状态"><template #default="{ row }"><el-tag :type="statusType(row.status)">{{ row.status }}</el-tag></template></el-table-column>
+                <el-table-column prop="createdAt" label="创建时间" width="170" />
+              </el-table>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>服务小区监控</h2><span>近30日银行流水与最新对账</span></div>
+              <el-table :data="bankCommunitySummaries" height="260">
+                <el-table-column prop="communityName" label="小区" min-width="150" />
+                <el-table-column label="入账"><template #default="{ row }">¥{{ money(row.inAmount) }}</template></el-table-column>
+                <el-table-column label="出账"><template #default="{ row }">¥{{ money(row.outAmount) }}</template></el-table-column>
+                <el-table-column label="对账"><template #default="{ row }"><el-tag :type="statusType(row.latestReconciliationStatus || 'OPEN')">{{ row.latestReconciliationStatus || '未对账' }}</el-tag></template></el-table-column>
+              </el-table>
+            </section>
+          </div>
           <section class="panel">
             <div class="panel-head">
               <h2>多银行直连适配</h2>
@@ -2235,12 +2479,29 @@ onMounted(async () => {
             </el-table>
           </section>
           <div class="dashboard-grid">
-            <section class="panel">
+            <section v-if="user.role === 'BANK'" class="panel">
+              <div class="panel-head"><h2>申请开通小区银行服务</h2><span>银行入驻后按小区申请代收或监管账户服务</span></div>
+              <el-form label-position="top">
+                <el-form-item label="服务小区">
+                  <el-select v-model="bankServiceApplicationForm.communityId">
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="服务类型">
+                  <el-segmented v-model="bankServiceApplicationForm.serviceType" :options="[{ label: '缴费代收', value: 'COLLECTION' }, { label: '资金监管', value: 'SUPERVISION' }]" />
+                </el-form-item>
+                <el-form-item label="商户号/监管编号">
+                  <el-input v-model="bankServiceApplicationForm.merchantNo" />
+                </el-form-item>
+                <el-button type="primary" @click="submitBankServiceApplication">提交服务开通申请</el-button>
+              </el-form>
+            </section>
+            <section v-if="canManageBankConfig" class="panel">
               <div class="panel-head"><h2>银行服务配置</h2><span>小区代收、监管账户服务</span></div>
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="bankConfigForm.communityId">
-                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="银行机构">
@@ -2262,7 +2523,7 @@ onMounted(async () => {
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="reconciliationForm.communityId">
-                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="服务类型">
@@ -2279,7 +2540,7 @@ onMounted(async () => {
               <el-form label-position="top">
                 <el-form-item label="小区">
                   <el-select v-model="bankFlowImportForm.communityId">
-                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="方向">
@@ -2364,12 +2625,30 @@ onMounted(async () => {
         </template>
 
         <template v-if="active === 'registrations'">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>小区中心五方注册</h2>
+              <span>围绕一个小区挂接物业、政府、业委会、银行、住户</span>
+              <div class="actions">
+                <el-select v-model="registrationCenterCommunityId" class="tenant-switch" @change="changeRegistrationCommunity">
+                  <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
+                </el-select>
+              </div>
+            </div>
+            <div class="registration-party-grid">
+              <article v-for="item in fivePartyCommunityStatus" :key="item.party">
+                <span>{{ item.party }}</span>
+                <strong>{{ item.owner }}</strong>
+                <small>{{ item.status }}</small>
+              </article>
+            </div>
+          </section>
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>机构注册</h2><span>物业、银行、政府机构准入</span></div>
+              <div class="panel-head"><h2>五方主体入驻</h2><span>物业、政府、业委会、银行先成为平台机构</span></div>
               <el-form label-position="top">
                 <el-form-item label="机构类型">
-                  <el-segmented v-model="tenantRegistrationForm.tenantType" :options="[{ label: '物业', value: 'PROPERTY' }, { label: '银行', value: 'BANK' }, { label: '政府', value: 'GOVERNMENT' }]" />
+                  <el-segmented v-model="tenantRegistrationForm.tenantType" :options="tenantTypeOptions" />
                 </el-form-item>
                 <el-form-item label="机构名称">
                   <el-input v-model="tenantRegistrationForm.tenantName" />
@@ -2396,42 +2675,33 @@ onMounted(async () => {
               </el-form>
             </section>
             <section class="panel">
-              <div class="panel-head"><h2>已入驻机构</h2><span>平台租户主档</span></div>
-              <el-table :data="data.tenants" height="360">
-                <el-table-column prop="tenantName" label="机构" min-width="180" />
-                <el-table-column prop="tenantType" label="类型" />
-                <el-table-column prop="contactName" label="联系人" />
-                <el-table-column prop="status" label="状态" />
-              </el-table>
+              <div class="panel-head"><h2>小区/业委会建档</h2><span>先形成小区主档，再挂接五方关系</span></div>
+              <el-form label-position="top">
+                <el-form-item label="行政区">
+                  <el-input v-model="communityRegistrationForm.district" />
+                </el-form-item>
+                <el-form-item label="街道">
+                  <el-input v-model="communityRegistrationForm.street" />
+                </el-form-item>
+                <el-form-item label="社区">
+                  <el-input v-model="communityRegistrationForm.neighborhood" />
+                </el-form-item>
+                <el-form-item label="小区名称">
+                  <el-input v-model="communityRegistrationForm.name" />
+                </el-form-item>
+                <el-form-item label="户数">
+                  <el-input-number v-model="communityRegistrationForm.households" :min="0" :step="100" />
+                </el-form-item>
+                <el-form-item label="联系电话">
+                  <el-input v-model="communityRegistrationForm.contactPhone" />
+                </el-form-item>
+                <el-button type="primary" @click="submitCommunityRegistration">提交小区备案</el-button>
+              </el-form>
             </section>
           </div>
-          <section class="panel">
-            <div class="panel-head"><h2>小区备案申请</h2><span>审核通过后生成平台小区主档</span></div>
-            <el-form class="inline-form" label-position="top">
-              <el-form-item label="行政区">
-                <el-input v-model="communityRegistrationForm.district" />
-              </el-form-item>
-              <el-form-item label="街道">
-                <el-input v-model="communityRegistrationForm.street" />
-              </el-form-item>
-              <el-form-item label="社区">
-                <el-input v-model="communityRegistrationForm.neighborhood" />
-              </el-form-item>
-              <el-form-item label="小区名称">
-                <el-input v-model="communityRegistrationForm.name" />
-              </el-form-item>
-              <el-form-item label="户数">
-                <el-input-number v-model="communityRegistrationForm.households" :min="0" :step="100" />
-              </el-form-item>
-              <el-form-item label="联系电话">
-                <el-input v-model="communityRegistrationForm.contactPhone" />
-              </el-form-item>
-              <el-button type="primary" @click="submitCommunityRegistration">提交备案申请</el-button>
-            </el-form>
-          </section>
           <div class="dashboard-grid">
             <section class="panel">
-              <div class="panel-head"><h2>小区服务申请</h2><span>物业/业委会申请服务小区，审核后自动授权</span></div>
+              <div class="panel-head"><h2>挂接小区服务关系</h2><span>物业、政府、业委会围绕当前小区授权</span></div>
               <el-form label-position="top">
                 <el-form-item label="机构">
                   <el-select v-model="relationApplicationForm.tenantId">
@@ -2440,17 +2710,15 @@ onMounted(async () => {
                 </el-form-item>
                 <el-form-item label="小区">
                   <el-select v-model="relationApplicationForm.communityId">
-                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="关系类型">
                   <el-select v-model="relationApplicationForm.relationType">
-                    <el-option label="物业服务" value="PROPERTY_SERVICE" />
-                    <el-option label="业委会治理" value="COMMITTEE_GOVERN" />
-                    <el-option label="政府监管" value="SUPERVISION" />
+                    <el-option v-for="item in relationTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
                   </el-select>
                 </el-form-item>
-                <el-button type="primary" @click="submitRelationApplication">提交服务申请</el-button>
+                <el-button type="primary" @click="submitRelationApplication">提交关系申请</el-button>
               </el-form>
             </section>
             <section class="panel">
@@ -2463,7 +2731,7 @@ onMounted(async () => {
                 </el-form-item>
                 <el-form-item label="小区">
                   <el-select v-model="bankServiceApplicationForm.communityId">
-                    <el-option v-for="item in data.communities || []" :key="item.id" :label="item.name" :value="item.id" />
+                    <el-option v-for="item in communityOptions" :key="item.id" :label="item.name" :value="item.id" />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="服务类型">
@@ -2474,6 +2742,26 @@ onMounted(async () => {
                 </el-form-item>
                 <el-button type="primary" @click="submitBankServiceApplication">提交银行服务申请</el-button>
               </el-form>
+            </section>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-head"><h2>当前小区已挂接五方</h2><span>服务关系与授权的主线视图</span></div>
+              <el-table :data="registrationCommunityRelations" height="300">
+                <el-table-column prop="tenantName" label="主体" min-width="180" />
+                <el-table-column prop="tenantType" label="类型" />
+                <el-table-column prop="relationType" label="关系" min-width="150" />
+                <el-table-column label="状态"><template #default="{ row }"><el-tag :type="statusType(row.status)">{{ row.status }}</el-tag></template></el-table-column>
+              </el-table>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>已入驻机构</h2><span>平台租户主档</span></div>
+              <el-table :data="data.tenants" height="300">
+                <el-table-column prop="tenantName" label="机构" min-width="180" />
+                <el-table-column prop="tenantType" label="类型" />
+                <el-table-column prop="contactName" label="联系人" />
+                <el-table-column prop="status" label="状态" />
+              </el-table>
             </section>
           </div>
           <section class="panel">

@@ -28,6 +28,107 @@ public class BankController {
         this.integrations = integrations;
     }
 
+    @GetMapping("/workbench")
+    public BankWorkbench workbench(HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "BANK");
+        List<Long> allowedCommunityIds = allowedCommunities(request, null, "BANK_FLOW", "READ");
+        if (allowedCommunityIds.isEmpty()) {
+            return new BankWorkbench(
+                0, 0, BigDecimal.ZERO, BigDecimal.ZERO,
+                0, BigDecimal.ZERO, 0, 0, adapterWarningCount(),
+                List.of(), List.of()
+            );
+        }
+        int activeConfigCount = countForCommunities("""
+                select count(*) from community_bank_config
+                where status = 'ACTIVE' and community_id in (:allowedCommunityIds)
+                """, allowedCommunityIds);
+        BigDecimal todayInAmount = amountForCommunities("""
+                select coalesce(sum(amount), 0) from bank_flow
+                where community_id in (:allowedCommunityIds)
+                  and direction = 'IN'
+                  and cast(occurred_at as date) = current_date
+                """, allowedCommunityIds);
+        BigDecimal todayOutAmount = amountForCommunities("""
+                select coalesce(sum(amount), 0) from bank_flow
+                where community_id in (:allowedCommunityIds)
+                  and direction = 'OUT'
+                  and cast(occurred_at as date) = current_date
+                """, allowedCommunityIds);
+        int pendingDisbursementCount = countForCommunities("""
+                select count(*) from bank_disbursement_instruction
+                where community_id in (:allowedCommunityIds) and status = 'PENDING'
+                """, allowedCommunityIds);
+        BigDecimal pendingDisbursementAmount = amountForCommunities("""
+                select coalesce(sum(amount), 0) from bank_disbursement_instruction
+                where community_id in (:allowedCommunityIds) and status = 'PENDING'
+                """, allowedCommunityIds);
+        int diffReconciliationCount = countForCommunities("""
+                select count(*) from reconciliation_record
+                where community_id in (:allowedCommunityIds) and status = 'DIFF'
+                """, allowedCommunityIds);
+        int openReconciliationDetailCount = countForCommunities("""
+                select count(*)
+                from reconciliation_detail rd
+                join reconciliation_record r on r.id = rd.reconciliation_id
+                where r.community_id in (:allowedCommunityIds)
+                  and rd.status <> 'MATCHED'
+                  and rd.handled_status = 'OPEN'
+                """, allowedCommunityIds);
+        List<BankTodoRow> todos = jdbc.sql("""
+                select * from (
+                  select 'DISBURSEMENT' todoType, d.id businessId, c.name communityName,
+                         d.instruction_no businessNo, d.amount, d.status, d.created_at createdAt
+                  from bank_disbursement_instruction d
+                  join community c on c.id = d.community_id
+                  where d.community_id in (:allowedCommunityIds) and d.status = 'PENDING'
+                  union all
+                  select 'RECONCILIATION' todoType, r.id businessId, c.name communityName,
+                         concat(date_format(r.reconcile_date, '%Y-%m-%d'), '/', coalesce(cfg.service_type, 'UNKNOWN')) businessNo,
+                         abs(r.diff_amount) amount, r.status, r.created_at createdAt
+                  from reconciliation_record r
+                  join community c on c.id = r.community_id
+                  left join community_bank_config cfg on cfg.id = r.bank_config_id
+                  where r.community_id in (:allowedCommunityIds) and r.status = 'DIFF'
+                ) bank_todos
+                order by createdAt desc
+                limit 20
+                """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(BankTodoRow.class)
+            .list();
+        List<BankCommunitySummaryRow> communitySummaries = jdbc.sql("""
+                select c.id communityId, c.name communityName,
+                       (select count(*) from community_bank_config cfg
+                        where cfg.community_id = c.id and cfg.status = 'ACTIVE') activeConfigCount,
+                       (select coalesce(sum(bf.amount), 0) from bank_flow bf
+                        where bf.community_id = c.id and bf.direction = 'IN'
+                          and bf.occurred_at >= date_sub(now(), interval 30 day)) inAmount,
+                       (select coalesce(sum(bf.amount), 0) from bank_flow bf
+                        where bf.community_id = c.id and bf.direction = 'OUT'
+                          and bf.occurred_at >= date_sub(now(), interval 30 day)) outAmount,
+                       (select count(*) from bank_disbursement_instruction d
+                        where d.community_id = c.id and d.status = 'PENDING') pendingDisbursementCount,
+                       (select r.status from reconciliation_record r
+                        where r.community_id = c.id
+                        order by r.reconcile_date desc, r.id desc limit 1) latestReconciliationStatus,
+                       (select r.reconcile_date from reconciliation_record r
+                        where r.community_id = c.id
+                        order by r.reconcile_date desc, r.id desc limit 1) latestReconcileDate
+                from community c
+                where c.id in (:allowedCommunityIds)
+                order by pendingDisbursementCount desc, c.id
+                """)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(BankCommunitySummaryRow.class)
+            .list();
+        return new BankWorkbench(
+            allowedCommunityIds.size(), activeConfigCount, todayInAmount, todayOutAmount,
+            pendingDisbursementCount, pendingDisbursementAmount, diffReconciliationCount,
+            openReconciliationDetailCount, adapterWarningCount(), todos, communitySummaries
+        );
+    }
+
     @GetMapping("/configs")
     public List<BankConfigRow> configs(@RequestParam(required = false) Long communityId, HttpServletRequest request) {
         requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "BANK");
@@ -646,6 +747,37 @@ public class BankController {
         return access.allowedCommunityIds(principal, dataScope, action);
     }
 
+    private int countForCommunities(String sql, List<Long> allowedCommunityIds) {
+        Integer count = jdbc.sql(sql)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(Integer.class)
+            .single();
+        return count == null ? 0 : count;
+    }
+
+    private BigDecimal amountForCommunities(String sql, List<Long> allowedCommunityIds) {
+        BigDecimal amount = jdbc.sql(sql)
+            .param("allowedCommunityIds", allowedCommunityIds)
+            .query(BigDecimal.class)
+            .single();
+        return amount == null ? BigDecimal.ZERO : amount;
+    }
+
+    private int adapterWarningCount() {
+        Integer count = jdbc.sql("""
+                select count(*)
+                from bank_adapter_profile p
+                left join bank_adapter_health h on h.id = (
+                    select max(latest_health.id) from bank_adapter_health latest_health where latest_health.bank_code = p.bank_code
+                )
+                where p.status not in ('ACTIVE', 'READY')
+                   or coalesce(h.check_result, 'PASS') <> 'PASS'
+                """)
+            .query(Integer.class)
+            .single();
+        return count == null ? 0 : count;
+    }
+
     private TokenService.Principal principal(HttpServletRequest request) {
         return (TokenService.Principal) request.getAttribute("principal");
     }
@@ -908,6 +1040,9 @@ public class BankController {
     }
 
     public record BankConfigRequest(long communityId, long bankTenantId, String serviceType, Long fundAccountId, String merchantNo) {}
+    public record BankWorkbench(int allowedCommunityCount, int activeConfigCount, BigDecimal todayInAmount, BigDecimal todayOutAmount, int pendingDisbursementCount, BigDecimal pendingDisbursementAmount, int diffReconciliationCount, int openReconciliationDetailCount, int adapterWarningCount, List<BankTodoRow> todos, List<BankCommunitySummaryRow> communitySummaries) {}
+    public record BankTodoRow(String todoType, long businessId, String communityName, String businessNo, BigDecimal amount, String status, LocalDateTime createdAt) {}
+    public record BankCommunitySummaryRow(long communityId, String communityName, int activeConfigCount, BigDecimal inAmount, BigDecimal outAmount, int pendingDisbursementCount, String latestReconciliationStatus, LocalDate latestReconcileDate) {}
     public record BankAdapterProfileRow(long id, String bankCode, String bankName, Long bankTenantId, String bankTenantName, String apiBaseUrl, String signAlgorithm, String callbackAlgorithm, String statementMode, String disbursementMode, String status, String lastCheckResult, String lastEvidence, LocalDateTime lastCheckedAt) {}
     public record BankAdapterHealthRow(long id, String bankCode, String bankName, String checkItem, String checkResult, int latencyMs, String evidence, LocalDateTime checkedAt) {}
     public record BankAdapterHealthResult(String bankCode, String checkResult, int latencyMs, String evidence) {}

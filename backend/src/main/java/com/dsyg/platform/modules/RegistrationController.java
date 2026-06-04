@@ -159,6 +159,18 @@ public class RegistrationController {
         return Map.of("applicationNo", applicationNo, "status", "PENDING");
     }
 
+    @GetMapping("/registrations/community-options")
+    public List<CommunityOptionRow> registrationCommunityOptions(HttpServletRequest request) {
+        requireAnyRole(request, "ADMIN", "GOVERNMENT", "STREET", "PROPERTY", "COMMITTEE", "BANK");
+        return jdbc.sql("""
+                select id, district, street, neighborhood, name
+                from community
+                order by district, street, name, id
+                """)
+            .query(CommunityOptionRow.class)
+            .list();
+    }
+
     @PostMapping("/registrations/community-relations")
     public Map<String, Object> registerCommunityRelation(@RequestBody CommunityRelationApplicationRequest body, HttpServletRequest request) {
         TokenService.Principal principal = principal(request);
@@ -847,6 +859,7 @@ public class RegistrationController {
             .param("communityId", communityId)
             .param("relationType", "COLLECTION".equals(serviceType) ? "BANK_COLLECTION" : "BANK_SUPERVISION")
             .update();
+        grantScopes(1, bankTenantId, communityId, new String[]{"COMMUNITY_PROFILE"}, new String[]{"READ"});
         grantScopes(1, bankTenantId, communityId, new String[]{"PAYMENT", "BANK_FLOW"}, new String[]{"READ", "WRITE"});
         jdbc.sql("""
                 update registration_application
@@ -1088,6 +1101,7 @@ public class RegistrationController {
 
     public record TenantRegistrationRequest(String tenantType, String tenantName, String unifiedCreditCode, String contactName, String contactPhone, String adminUsername, String adminPassword, String adminDisplayName) {}
     public record CommunityRegistrationRequest(String district, String street, String neighborhood, String name, int households, String contactPhone) {}
+    public record CommunityOptionRow(long id, String district, String street, String neighborhood, String name) {}
     public record CommunityRelationApplicationRequest(long tenantId, long communityId, String relationType, LocalDate startDate, List<String> dataScopes, List<String> permissions) {}
     public record BankServiceApplicationRequest(long bankTenantId, long communityId, String serviceType, Long fundAccountId, String merchantNo) {}
     public record ResidentRegisterRequest(String username, String password, String name, String phone) {}

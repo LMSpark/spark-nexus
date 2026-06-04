@@ -129,6 +129,14 @@ class MultiTenantAcceptanceTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)))
             .andExpect(jsonPath("$[*].serviceType", hasItem("COLLECTION")));
+        mockMvc.perform(get("/api/registrations/community-options").header("Authorization", bearer(bankToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id", hasItem(1)));
+        mockMvc.perform(get("/api/bank/workbench").header("Authorization", bearer(bankToken)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.allowedCommunityCount", greaterThanOrEqualTo(1)))
+            .andExpect(jsonPath("$.activeConfigCount", greaterThanOrEqualTo(1)))
+            .andExpect(jsonPath("$.communitySummaries[*].communityId", hasItem(1)));
         mockMvc.perform(get("/api/bank/adapters").header("Authorization", bearer(bankToken)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[*].bankCode", hasItems("HANKOU_BANK", "CCB_WUHAN")));
