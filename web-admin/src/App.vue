@@ -7,6 +7,8 @@ import heroImage from './assets/community-governance-hero.png'
 
 type AnyRow = Record<string, any>
 
+const ownerAppUrl = ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_OWNER_APP_URL || 'http://localhost:5684/') as string
+
 const nav = [
   ['dashboard', 'Nexus 驾驶舱'],
   ['screen', '治理大屏'],
@@ -42,36 +44,83 @@ const relationTypeOptions = [
 ]
 
 const landingStats = [
-  { value: '5方+商户', label: '小区、物业、政府、业委会、银行、住户与社区商户统一入驻' },
-  { value: '1张图', label: 'GIS、房屋、账户、工单、收益、风险一屏联动' },
-  { value: '1个住户端', label: 'App / 小程序把缴费、报修、投票、租售、快递、餐饮、商户优惠都办完' }
+  { value: '城市级', label: '以小区作为城市治理最小可运营单元，承接公共服务、居民自治与商业生态' },
+  { value: '可信链', label: '身份、房屋、资金、事项、服务全链路授权留痕，让协同有边界、有证据' },
+  { value: '生态座', label: '从物业管理走向社区生活入口，把本地服务沉淀为可监管的数字经济' }
 ]
 
 const policyCards = [
-  { title: '基层治理现代化', text: '把小区治理、居民服务、事项协同放到统一数字底座，支撑社区、街道、部门协同。' },
-  { title: '住宅物业管理改进', text: '围绕物业服务公开、业主参与、维修资金和公共收益监管，形成可追溯的治理闭环。' },
-  { title: '民法典业主共同决定', text: '业主大会、业委会、公共收益使用和重大事项表决，通过线上留痕和授权边界降低争议。' },
-  { title: '数字中国与数据要素', text: '用标准接口沉淀房屋、主体、资金、服务和信用数据，给城市治理和社区服务提供可复用能力。' }
+  { title: '居委会依法有抓手', text: '公共事务、公益事业、便民服务、矛盾纠纷、物业纠纷协助，都可以沉淀为平台事项。' },
+  { title: '街道社区有指挥链', text: '以社区为社会治理基本单元，把居民诉求、网格巡查、协商议事、部门协办放进闭环。' },
+  { title: '业委会物业有协同面', text: '居委会牵头议事协调，业委会、物业、银行、商户按小区授权协同，不再各说各话。' },
+  { title: '政府管理有数据账', text: '每个小区的诉求、调解、资金、投票、服务、风险都有台账，能督办、能考核、能复盘。' }
+]
+
+const strategicPillars = [
+  { title: '从物业工具到城市社区操作系统', text: '平台不是替某一方做表格，而是把小区公共事务、居民服务和城市治理连接成一套长期运行的数字基础设施。', tag: '治理范式' },
+  { title: '从信息孤岛到可信协同网络', text: '物业、业委会、政府、银行、住户、商户在同一小区主档下协作，所有数据按角色、场景、授权和审计边界流转。', tag: '协同秩序' },
+  { title: '从线下窗口到社区数字经济入口', text: '缴费、报修、投票、房屋、快递、餐饮、商户服务不是流量拼盘，而是基于身份与小区授权的可信生活服务网络。', tag: '生态增长' }
+]
+
+const trustFoundations = [
+  { code: '01', title: '可信身份', text: '主体注册、实名住户、房屋绑定、角色权限统一校验。' },
+  { code: '02', title: '可信房屋', text: '以小区、楼栋、房屋为治理坐标，承载服务与资产关系。' },
+  { code: '03', title: '可信资金', text: '账单、支付、监管账户、流水、凭证、审批同链路穿透。' },
+  { code: '04', title: '可信服务', text: '商户、政务、便民和 IoT 服务按小区授权接入并可监管。' }
 ]
 
 const registrationRoles = [
   { title: '小区/业委会', desc: '小区建档、业委会入驻、业主大会与公共收益治理', action: 'community', tenantType: 'COMMITTEE' },
   { title: '物业公司', desc: '收费、报修、公告、服务评价和运营数据接入', action: 'tenant', tenantType: 'PROPERTY' },
-  { title: '政府街道', desc: '辖区监管、风险预警、注册审核与信用评分', action: 'tenant', tenantType: 'GOVERNMENT' },
+  { title: '街道/居委会', desc: '网格治理、居民议事、矛盾调解、物业协同与风险督办', action: 'tenant', tenantType: 'GOVERNMENT' },
   { title: '银行机构', desc: '代收、监管账户、对账、放款和回调验签', action: 'tenant', tenantType: 'BANK' },
   { title: '住户', desc: '账号注册、实名房屋绑定、缴费、投票和服务请求', action: 'resident', tenantType: 'OWNER' },
   { title: '社区商户', desc: '餐饮、零售、家政、维修、养老托育和团购服务入驻', action: 'tenant', tenantType: 'MERCHANT' }
 ]
 
+const committeeFeatures = [
+  { title: '社情民意上报', text: '居民随手拍、语音文字、位置上传，诉求自动进入居委会/网格员待办。' },
+  { title: '网格巡查闭环', text: '网格员签到、巡查、事件受理、派单、处置、超时预警和考核留痕。' },
+  { title: '居民议事协商', text: '议题征集、方案公示、会议记录、线上表决、结果公开和后续监督。' },
+  { title: '居务公开阵地', text: '政策宣传、办事指南、居民公约、公益项目、活动报名和志愿服务发布。' },
+  { title: '重点人群关爱', text: '老人、儿童、残障、困难家庭、特殊群体形成关爱台账和走访提醒。' },
+  { title: '物业矛盾调解', text: '把物业、业委会、住户、银行和商户拉进同一事项，调解过程可追溯。' },
+  { title: '驻区资源联动', text: '社区医院、派出所、市场监管、志愿队、骑手、商户按事项协同参与。' },
+  { title: '一张图治理', text: '楼栋、房屋、网格、事件、风险、人员和公共设施在地图上统一落点。' }
+]
+
+const committeeWorkflow = [
+  '居民说事',
+  '网格受理',
+  '居委会研判',
+  '多方协办',
+  '公开反馈'
+]
+
+const committeeMetrics = [
+  { value: '5步', label: '民意到反馈闭环' },
+  { value: '8类', label: '居委会可承接事项' },
+  { value: 'N方', label: '驻区单位与社会力量' }
+]
+
 const ecosystemCapabilities = [
-  { code: 'GIS', title: '小区一张图', text: '接楼栋、房屋、车位、设备、网格、事件热力，把空间位置变成治理入口。' },
-  { code: '房', title: '可信房屋服务', text: '把租售、空置房、经纪机构、合同备案和业主授权放进小区可信服务场景。' },
-  { code: '递', title: '快递驿站', text: '对接快递柜、驿站、到件提醒、异常件和末端配送服务。' },
-  { code: '餐', title: '社区餐饮', text: '接入助老餐、团餐、商户优惠、食品安全公示和居民订单服务。' },
-  { code: '商', title: '商户入驻', text: '商户先提交资质，再绑定小区服务范围，优惠、订单、评价和风控都留在平台内。' },
-  { code: '银', title: '金融与银行', text: '银行代收、资金监管、放款、票据、保险和金融服务围绕小区账户闭环。' },
-  { code: '政', title: '政务协同', text: '街道、社区、住建、市场监管、公安消防等事项可按权限接入。' },
-  { code: '物', title: 'IoT与安防', text: '门禁、电梯、消防、能耗、摄像头、充电桩等设备数据进入风险联动。' }
+  { code: 'GIS', title: '空间治理能力', text: '楼栋、房屋、网格、设施、风险、事件统一落图，形成城市运行向小区延伸的空间底座。' },
+  { code: '房', title: '房屋资产能力', text: '租售、空置、授权、备案、经纪服务围绕真实房屋关系流转，房源可信、交易可管。' },
+  { code: '递', title: '末端配送能力', text: '快递柜、驿站、骑手、异常件、无接触配送纳入社区服务网络，解决最后一百米。' },
+  { code: '餐', title: '民生供给能力', text: '助老餐、团餐、生鲜、食品安全、价格公示和居民订单进入可评价、可监管的供给体系。' },
+  { code: '商', title: '本地商业能力', text: '商户资质、服务范围、优惠、订单、投诉、评价和退出机制统一沉淀，形成小区可信商圈。' },
+  { code: '银', title: '金融服务能力', text: '代收、监管账户、对账、票据、保险、授信和放款围绕小区资金与主体信用闭环。' },
+  { code: '政', title: '政务协同能力', text: '街道、社区、住建、市场监管、公安消防等事项按职责接入，居民诉求可分派、可督办。' },
+  { code: '物', title: '物联感知能力', text: '门禁、电梯、消防、能耗、摄像头、充电桩等设备数据进入风险预警和服务调度。' }
+]
+
+const ecosystemRules = [
+  { title: '统一准入', text: '主体资质、服务范围、履约能力、信用记录先审核，再允许进入小区服务场景。' },
+  { title: '分级授权', text: '按小区、楼栋、房屋、账户、人员、事项和数据域授予最小必要权限。' },
+  { title: '场景编排', text: '把服务能力编排进缴费、报修、议事、关爱、租售、配送等真实居民流程。' },
+  { title: '过程监管', text: '订单、工单、投诉、评价、资金、票据、设备事件全程留痕，政府和居委会可看可管。' },
+  { title: '价值闭环', text: '公共收益、服务评价、信用评分、运营分润和风险处置回到小区治理台账。' },
+  { title: '动态退出', text: '违规商户、异常服务、风险设备和不合规接口可以降权、暂停、清退并留存证据。' }
 ]
 
 const residentAppFeatures = [
@@ -96,11 +145,11 @@ const merchantScenarios = [
 ]
 
 const platformPrinciples = [
-  '小区为中心，不以单一物业或单一部门为中心',
-  '五方先入驻，再授权，再协同，数据边界清清楚楚',
-  '公共收益、资金、投票、审批、对账全程留痕',
-  '商户只有在小区授权后提供服务，不做脱离治理底座的流量平台',
-  '住户一个 App / 小程序办完小区生活，平台做秩序、身份、数据和监管底座'
+  '小区是城市治理的基本单元，也是居民生活服务和本地商业的真实入口',
+  '平台先建立公共秩序，再承载商业生态，避免把社区服务做成无边界流量市场',
+  '五方主体先注册、再授权、再协同，任何数据流转都能说清来源、用途和责任',
+  '公共收益、资金账户、投票决策、支出审批、银行对账必须可穿透、可核验、可追责',
+  '住户端不是另一个工具，而是把公共事务、生活服务和治理参与汇聚到一个可信入口'
 ]
 
 const onboardingSteps = [
@@ -257,12 +306,12 @@ const tenantRegistrationPresets: Record<string, Partial<typeof tenantRegistratio
     adminDisplayName: '物业机构管理员'
   },
   GOVERNMENT: {
-    tenantName: '新入驻街道办事处',
+    tenantName: '新入驻社区居民委员会',
     unifiedCreditCode: '',
-    contactName: '街道经办人',
+    contactName: '居委会经办人',
     contactPhone: '13800000002',
-    adminUsername: 'gov_new',
-    adminDisplayName: '政府监管经办员'
+    adminUsername: 'committee_gov_new',
+    adminDisplayName: '社区治理经办员'
   },
   COMMITTEE: {
     tenantName: '新小区业主委员会',
@@ -1155,7 +1204,8 @@ function openPublicRegistration(mode: PublicRegistrationMode, tenantType = 'PROP
 }
 
 function openResidentRegistrationHint() {
-  ElMessage.info('住户请在业主端完成账号注册，并提交实名房屋绑定审核')
+  window.open(ownerAppUrl, '_blank')
+  ElMessage.success('已打开住户移动端，请在业主端注册并提交实名房屋绑定审核')
 }
 
 function scrollToLanding(sectionId: string) {
@@ -1641,6 +1691,7 @@ onMounted(async () => {
       </div>
       <nav>
         <button @click="scrollToLanding('policy')">国家政策</button>
+        <button @click="scrollToLanding('committee')">居委会抓手</button>
         <button @click="scrollToLanding('registration')">入驻中心</button>
         <button @click="scrollToLanding('resident-app')">住户端</button>
         <button @click="scrollToLanding('merchant')">商户入驻</button>
@@ -1687,8 +1738,8 @@ onMounted(async () => {
     <main class="landing-main">
       <section id="policy" class="landing-section">
         <div class="landing-section-head">
-          <h2>国家政策牵引下的社区治理数字底座</h2>
-          <p>平台围绕基层治理现代化、住宅物业管理改进、业主共同决定和数字中国建设，把政策要求落到小区、主体、资金、事项和数据授权。</p>
+          <h2>把政策落到居委会，把政府管理落到小区</h2>
+          <p>居委会是政府联系居民、组织自治、协调物业矛盾和动员社会力量的基层抓手。SPARK Nexus 把这个抓手数字化，让街道社区不是旁观者，而是小区治理的牵引者。</p>
         </div>
         <div class="policy-grid">
           <article v-for="item in policyCards" :key="item.title">
@@ -1698,10 +1749,32 @@ onMounted(async () => {
         </div>
       </section>
 
+      <section id="committee" class="landing-section committee-section">
+        <div class="committee-brief">
+          <h2>居委会工作台：让政府管理有入口、有台账、有闭环</h2>
+          <p>把“居民找谁说、社区怎么办、物业谁来协调、部门如何协同、结果如何公开”做成标准流程。居委会不是多一个账号，而是整个平台的基层治理中枢。</p>
+          <div class="committee-flow">
+            <span v-for="item in committeeWorkflow" :key="item">{{ item }}</span>
+          </div>
+          <div class="committee-metrics">
+            <article v-for="item in committeeMetrics" :key="item.label">
+              <strong>{{ item.value }}</strong>
+              <span>{{ item.label }}</span>
+            </article>
+          </div>
+        </div>
+        <div class="committee-feature-grid">
+          <article v-for="item in committeeFeatures" :key="item.title">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+      </section>
+
       <section id="registration" class="landing-section registration-section">
         <div class="landing-section-head">
-          <h2>五方治理主体先入驻，商户生态再上架</h2>
-          <p>先建小区主档，再让物业、政府、业委会、银行、住户和社区商户按角色入驻，所有权限都围绕小区和数据域授权。</p>
+          <h2>居委会牵引五方治理主体入驻，商户生态再上架</h2>
+          <p>先建小区主档，再让街道社区、居委会、物业、业委会、银行、住户和社区商户按角色入驻，所有权限都围绕小区、事项和数据域授权。</p>
         </div>
         <div class="registration-entry-grid">
           <button v-for="item in registrationRoles" :key="item.title" @click="item.action === 'community' ? openPublicRegistration('community') : item.action === 'resident' ? openResidentRegistrationHint() : openPublicRegistration('tenant', item.tenantType)">
@@ -1747,9 +1820,15 @@ onMounted(async () => {
       </section>
 
       <section id="ecosystem" class="landing-section">
-        <div class="landing-section-head">
-          <h2>开放生态接入：什么都能搞，但要有秩序</h2>
-          <p>平台不是把功能堆成孤岛，而是提供身份、房屋、小区、账户、授权、审计、消息和接口规范，让生态服务接得进、管得住、查得到。</p>
+        <div class="landing-section-head ecosystem-head">
+          <h2>社区服务生态操作系统：让城市服务有序进入小区</h2>
+          <p>SPARK Nexus 不做无边界的功能堆叠，而是把每一种外部能力转化为“可准入、可授权、可监管、可结算、可评价、可退出”的社区服务资产。</p>
+        </div>
+        <div class="ecosystem-rule-strip">
+          <article v-for="item in ecosystemRules" :key="item.title">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.text }}</span>
+          </article>
         </div>
         <div class="ecosystem-grid">
           <article v-for="item in ecosystemCapabilities" :key="item.title">
@@ -1761,11 +1840,25 @@ onMounted(async () => {
       </section>
 
       <section class="landing-section philosophy-section">
-        <div>
+        <div class="philosophy-intro">
           <h2>平台理念</h2>
-          <p>SPARK Nexus 做的不是单点工具，而是小区公共事务、商业服务和政府监管之间的可信连接层。</p>
+          <p>SPARK Nexus 做的不是单点工具，而是城市社区数字基础设施：先建立治理秩序，再承接生活服务，再沉淀可监管、可运营、可持续的社区数字经济。</p>
         </div>
-        <ul>
+        <div class="strategy-grid">
+          <article v-for="item in strategicPillars" :key="item.title">
+            <span>{{ item.tag }}</span>
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+        <div class="trust-grid">
+          <article v-for="item in trustFoundations" :key="item.code">
+            <span>{{ item.code }}</span>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.text }}</p>
+          </article>
+        </div>
+        <ul class="principle-list">
           <li v-for="item in platformPrinciples" :key="item">{{ item }}</li>
         </ul>
       </section>

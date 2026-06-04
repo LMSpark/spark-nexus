@@ -24,9 +24,10 @@ const houseBindings = ref<AnyRow[]>([])
 const houseBindingApplications = ref<AnyRow[]>([])
 const activeHouseId = ref(Number(uni.getStorageSync('activeHouseId') || 0))
 const ledger = ref<AnyRow>({})
-const tab = ref('缴费')
+const tab = ref('首页')
 const fallbackLoginAttempted = ref(false)
 const apiBase = ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE || uni.getStorageSync('apiBase') || '') as string
+const tabs = ['首页', '缴费', '账务', '公告', '投票', '报修', '我的']
 const workOrderForm = ref({
   orderType: 'REPAIR',
   priority: 'NORMAL',
@@ -43,6 +44,34 @@ const bindForm = ref({
 })
 
 const unpaid = computed(() => bills.value.filter((bill) => bill.status !== 'PAID'))
+const openWorkOrders = computed(() => workOrders.value.filter((item) => !['DONE', 'CLOSED'].includes(item.status)))
+const openVotes = computed(() => votes.value.filter((item) => item.status === 'OPEN'))
+const homeMetrics = computed(() => [
+  { label: '待缴费用', value: `¥${money(unpaid.value.reduce((sum, item) => sum + Number(item.amount), 0))}`, tone: 'warning' },
+  { label: '未读消息', value: `${unreadCount.value} 条`, tone: 'info' },
+  { label: '处理中工单', value: `${openWorkOrders.value.length} 个`, tone: 'service' },
+  { label: '进行中表决', value: `${openVotes.value.length} 项`, tone: 'vote' }
+])
+const mobileServices = [
+  { icon: '缴', title: '物业缴费', desc: '物业费、停车费、票据', tab: '缴费' },
+  { icon: '修', title: '报修投诉', desc: '拍照提交、进度评价', tab: '报修' },
+  { icon: '票', title: '业主投票', desc: '表决、问卷、结果留痕', tab: '投票' },
+  { icon: '告', title: '公告消息', desc: '通知、催缴、审批提醒', tab: '公告' },
+  { icon: '账', title: '公共账务', desc: '收益、支出、银行流水', tab: '账务' },
+  { icon: '房', title: '房屋租售', desc: '业主授权可信房源', toast: '房屋租售服务正在接入' },
+  { icon: '递', title: '快递到件', desc: '驿站、柜机、异常件', toast: '快递服务正在接入' },
+  { icon: '餐', title: '社区餐饮', desc: '助老餐、团餐、优惠', toast: '社区餐饮正在接入' },
+  { icon: '商', title: '商户优惠', desc: '小区授权本地商户', toast: '商户优惠正在接入' },
+  { icon: '门', title: '门禁访客', desc: '访客、门禁、车辆', toast: '门禁访客正在接入' }
+]
+const homeTasks = computed(() => {
+  const tasks = []
+  if (unpaid.value.length) tasks.push({ title: '待缴账单', text: `${unpaid.value.length} 笔费用待处理`, tab: '缴费' })
+  if (unreadCount.value) tasks.push({ title: '未读消息', text: `${unreadCount.value} 条公告或提醒未读`, tab: '公告' })
+  if (openWorkOrders.value.length) tasks.push({ title: '服务工单', text: `${openWorkOrders.value.length} 个报修/投诉正在处理`, tab: '报修' })
+  if (openVotes.value.length) tasks.push({ title: '业主表决', text: `${openVotes.value.length} 项投票或问卷进行中`, tab: '投票' })
+  return tasks.length ? tasks : [{ title: '今日无待办', text: '缴费、工单、投票和消息都已处理完', tab: '公告' }]
+})
 
 function request<T>(url: string, options: UniApp.RequestOptions = {}): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -254,6 +283,18 @@ async function evaluateWorkOrder(item: AnyRow, score: number) {
   }
 }
 
+function openService(item: AnyRow) {
+  if (item.tab) {
+    tab.value = item.tab
+    return
+  }
+  uni.showToast({ title: item.toast || `${item.title}正在接入`, icon: 'none' })
+}
+
+function openMerchantSignup() {
+  uni.showToast({ title: '商户入驻请在管理端提交主体资质', icon: 'none' })
+}
+
 async function bindHouse() {
   try {
     await request<AnyRow>('/api/resident/house-bindings', {
@@ -346,7 +387,52 @@ function seedDemo() {
     </view>
 
     <view class="tabs">
-      <button v-for="item in ['缴费', '账务', '公告', '投票', '报修', '我的']" :key="item" :class="{ active: tab === item }" @click="tab = item">{{ item }}{{ item === '公告' && unreadCount ? `(${unreadCount})` : '' }}</button>
+      <button v-for="item in tabs" :key="item" :class="{ active: tab === item }" @click="tab = item">{{ item }}{{ item === '公告' && unreadCount ? `(${unreadCount})` : '' }}</button>
+    </view>
+
+    <view v-if="tab === '首页'" class="list home-list">
+      <view class="home-summary">
+        <view v-for="item in homeMetrics" :key="item.label" class="stat home-stat" :class="item.tone">
+          <text>{{ item.label }}</text>
+          <strong>{{ item.value }}</strong>
+        </view>
+      </view>
+
+      <view class="section-card">
+        <view class="section-head">
+          <text class="section-title">小区生活服务台</text>
+          <text class="muted">一个 App / 小程序办完小区生活</text>
+        </view>
+        <view class="service-grid">
+          <button v-for="item in mobileServices" :key="item.title" class="service-card" @click="openService(item)">
+            <text class="service-icon">{{ item.icon }}</text>
+            <text class="service-title">{{ item.title }}</text>
+            <text class="service-desc">{{ item.desc }}</text>
+          </button>
+        </view>
+      </view>
+
+      <view class="merchant-banner">
+        <view>
+          <text class="title">社区商户服务</text>
+          <text class="content">餐饮、零售、家政、维修、房屋服务都从小区授权进入，住户看到可信服务，物业和政府可以监管。</text>
+        </view>
+        <button @click="openMerchantSignup">商户入驻</button>
+      </view>
+
+      <view class="section-card">
+        <view class="section-head">
+          <text class="section-title">今日待办</text>
+          <text class="muted">缴费、消息、工单、表决</text>
+        </view>
+        <view v-for="item in homeTasks" :key="item.title" class="task-row" @click="tab = item.tab">
+          <view>
+            <text class="title">{{ item.title }}</text>
+            <text class="muted">{{ item.text }}</text>
+          </view>
+          <text class="task-arrow">进入</text>
+        </view>
+      </view>
     </view>
 
     <view v-if="tab === '缴费'" class="list">
@@ -488,8 +574,8 @@ function seedDemo() {
 
 <style>
 .page { min-height: 100vh; padding: 28rpx; color: #17222b; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
-.page, .page view, .page text, .page button { box-sizing: border-box; }
-.page { width: 100%; max-width: 100vw; overflow-x: hidden; padding-left: 18rpx; padding-right: 18rpx; }
+.page, .page * { box-sizing: border-box; }
+.page { width: 100%; max-width: 750rpx; margin: 0 auto; overflow-x: hidden; padding-left: 18rpx; padding-right: 18rpx; }
 .hero { width: 100%; display: block; padding: 28rpx; background: #10242b; color: #fff; border-radius: 16rpx; overflow: hidden; }
 .hero > view:first-child { min-width: 0; }
 .eyebrow { display: block; margin-bottom: 12rpx; color: #69d7cc; font-size: 22rpx; font-weight: 700; letter-spacing: 0; }
@@ -498,15 +584,39 @@ function seedDemo() {
 .amount { text-align: left; margin-top: 18rpx; }
 .amount text { display: block; color: #b8ccd0; font-size: 24rpx; }
 .amount strong { display: block; margin-top: 10rpx; font-size: 30rpx; white-space: nowrap; }
-.tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10rpx; margin: 24rpx 0; }
-.tabs button { height: 68rpx; padding: 0; border: 0; border-radius: 10rpx; background: #fff; color: #586a72; font-size: 26rpx; line-height: 68rpx; }
+.tabs { display: flex; gap: 10rpx; margin: 24rpx 0; overflow-x: auto; padding-bottom: 2rpx; }
+.tabs button { flex: 0 0 auto; min-width: 112rpx; height: 68rpx; padding: 0 18rpx; border: 0; border-radius: 10rpx; background: #fff; color: #586a72; font-size: 26rpx; line-height: 68rpx; }
 .tabs button.active { background: #158f84; color: #fff; }
 .list { display: grid; gap: 18rpx; }
+.home-list { padding-bottom: 22rpx; }
+.home-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14rpx; }
 .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14rpx; }
 .section-title { display: block; margin-top: 8rpx; color: #40525a; font-size: 26rpx; font-weight: 650; }
 .stat { padding: 20rpx; border: 1px solid #dfe7ea; border-radius: 12rpx; background: #fff; }
 .stat text { display: block; color: #71828a; font-size: 23rpx; }
 .stat strong { display: block; margin-top: 10rpx; color: #17222b; font-size: 28rpx; white-space: nowrap; }
+.home-stat { min-height: 124rpx; }
+.home-stat.warning { border-color: #f2d09b; background: #fff8ee; }
+.home-stat.info { border-color: #c9dfef; background: #f2f9fe; }
+.home-stat.service { border-color: #c4e4dc; background: #f3fbf8; }
+.home-stat.vote { border-color: #d6d2ec; background: #f7f5ff; }
+.section-card { width: 100%; min-width: 0; padding: 24rpx; border: 1px solid #dfe7ea; border-radius: 14rpx; background: #fff; overflow: hidden; }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16rpx; margin-bottom: 18rpx; }
+.section-head .section-title { margin-top: 0; }
+.section-head .muted { flex: 1; margin-top: 0; text-align: right; font-size: 22rpx; }
+.service-grid { display: grid; width: 100%; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; overflow: hidden; }
+.service-card { width: 100%; min-width: 0; min-height: 154rpx; margin: 0; padding: 18rpx; border: 1px solid #dce8e9; border-radius: 14rpx; background: #f8fcfb; text-align: left; line-height: 1.2; }
+.service-icon { display: flex; width: 46rpx; height: 46rpx; align-items: center; justify-content: center; border-radius: 12rpx; background: #e2f5f1; color: #13796f; font-size: 24rpx; font-weight: 700; }
+.service-title { display: block; margin-top: 14rpx; color: #17222b; font-size: 27rpx; font-weight: 650; }
+.service-desc { display: block; margin-top: 8rpx; color: #71828a; font-size: 22rpx; line-height: 1.35; }
+.merchant-banner { display: grid; grid-template-columns: 1fr 172rpx; gap: 18rpx; align-items: center; padding: 24rpx; border-radius: 16rpx; background: #0f2d32; color: #fff; overflow: hidden; }
+.merchant-banner .title { color: #fff; font-size: 28rpx; }
+.merchant-banner .content { margin-top: 10rpx; color: #c9dcdd; font-size: 23rpx; line-height: 1.55; }
+.merchant-banner button { width: 172rpx; height: 62rpx; border: 0; border-radius: 10rpx; background: #4fd0c1; color: #073b3a; font-size: 24rpx; font-weight: 650; line-height: 62rpx; }
+.task-row { display: grid; grid-template-columns: 1fr 86rpx; gap: 12rpx; align-items: center; padding: 18rpx 0; border-top: 1px solid #edf2f5; }
+.section-card .task-row:first-of-type { border-top: 0; padding-top: 0; }
+.task-arrow { display: block; width: 86rpx; height: 52rpx; border-radius: 26rpx; background: #eef6f5; color: #158f84; font-size: 23rpx; font-weight: 650; line-height: 52rpx; text-align: center; }
+.tabs button::after, .service-card::after, .merchant-banner button::after { border: 0; }
 .card { width: 100%; display: block; padding: 24rpx; background: #fff; border: 1px solid #dfe7ea; border-radius: 14rpx; overflow: hidden; }
 .card > view:first-child { min-width: 0; }
 .card.block { display: grid; justify-content: stretch; }
